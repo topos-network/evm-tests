@@ -14,12 +14,12 @@
 use anyhow::Result;
 use common::revm::SerializableEVMInstance;
 
-use crate::deserialize::TestBody;
+use crate::deserialize::GeneralStateTestBody;
 
 mod cache_db;
 mod env;
 
-impl TestBody {
+impl GeneralStateTestBody {
     pub(crate) fn as_serializable_evm_instances(&self) -> Result<Vec<SerializableEVMInstance>> {
         let envs = self.as_revm_env()?;
         let db = self.as_revm_cache_db()?;
@@ -34,10 +34,10 @@ impl TestBody {
     }
 }
 
-impl TryFrom<TestBody> for Vec<SerializableEVMInstance> {
+impl TryFrom<GeneralStateTestBody> for Vec<SerializableEVMInstance> {
     type Error = anyhow::Error;
 
-    fn try_from(body: TestBody) -> Result<Self> {
+    fn try_from(body: GeneralStateTestBody) -> Result<Self> {
         body.as_serializable_evm_instances()
     }
 }

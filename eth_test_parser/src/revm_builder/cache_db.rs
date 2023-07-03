@@ -9,9 +9,9 @@ use revm::{
     InMemoryDB,
 };
 
-use crate::deserialize::TestBody;
+use crate::deserialize::GeneralStateTestBody;
 
-impl TestBody {
+impl GeneralStateTestBody {
     pub(crate) fn as_revm_cache_db(&self) -> Result<SerializableInMemoryDb> {
         let mut db = InMemoryDB::default();
 
@@ -34,10 +34,10 @@ impl TestBody {
     }
 }
 
-impl TryFrom<&TestBody> for SerializableInMemoryDb {
+impl TryFrom<&GeneralStateTestBody> for SerializableInMemoryDb {
     type Error = anyhow::Error;
 
-    fn try_from(body: &TestBody) -> Result<Self> {
+    fn try_from(body: &GeneralStateTestBody) -> Result<Self> {
         body.as_revm_cache_db()
     }
 }

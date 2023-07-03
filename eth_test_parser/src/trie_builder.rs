@@ -6,11 +6,14 @@
 //! crate::deserialize::TestBody -> plonky2_evm::generation::GenerationInputs
 //! ```
 use std::collections::HashMap;
+use std::str::FromStr;
+
+use plonky2_evm::Node;
 
 use anyhow::Result;
 use common::{
     config,
-    types::{ConstGenerationInputs, Plonky2ParsedTest, TestVariant, TestVariantCommon},
+    types::{ConstGenerationInputs, Plonky2ParsedTest, TestVariant, TestVariantCommon}, revm::SerializableEVMInstance,
 };
 use eth_trie_utils::{
     nibbles::Nibbles,
@@ -22,7 +25,7 @@ use plonky2_evm::{generation::TrieInputs, proof::BlockMetadata};
 use rlp::Encodable;
 use rlp_derive::{RlpDecodable, RlpEncodable};
 
-use crate::deserialize::{Env, TestBody};
+use crate::deserialize::{Env, TestBody, GeneralStateTestBody, BlockchainTestHeader};
 
 #[derive(RlpDecodable, RlpEncodable)]
 pub(crate) struct AccountRlp {
@@ -46,17 +49,15 @@ impl Env {
     }
 }
 
-impl TestBody {
+impl GeneralStateTestBody {
     pub fn as_plonky2_test_input(&self) -> Plonky2ParsedTest {
         let storage_tries = self.get_storage_tries();
         let state_trie = self.get_state_trie(&storage_tries);
+        let mut transactions_trie = HashedPartialTrie::default();
 
         let tries = TrieInputs {
             state_trie,
-            transactions_trie: HashedPartialTrie::default(), /* TODO: Change to
-                                                              * self.get_txn_trie()
-                                                              * once
-                                                              * zkEVM supports it */
+            transactions_trie: HashedPartialTrie::default(), // TODO: Is it ok to start with the empty trie?
             receipts_trie: HashedPartialTrie::default(), /* TODO: Fill in once we know what we
                                                           * are
                                                           * doing... */
@@ -73,11 +74,18 @@ impl TestBody {
             .post
             .shanghai
             .iter()
-            .map(|x| TestVariant {
-                txn_bytes: x.txbytes.0.clone(),
-                common: TestVariantCommon {
-                    expected_final_account_state_root_hash: x.hash,
-                },
+            .enumerate()
+            .map(|(txn_idx,x)| {
+                transactions_trie.insert(
+                    Nibbles::from_bytes_be(&<usize as Into<U256>>::into(txn_idx).rlp_bytes()).unwrap(), // TODO: There's probably a cleaner way for doing this
+                    x.txbytes.0.clone()
+                );
+                TestVariant {
+                    txn_bytes: x.txbytes.0.clone(),
+                    common: TestVariantCommon {
+                        expected_final_account_state_root_hash: x.hash,
+                        expected_final_transactions_root_hash: transactions_trie.hash()
+                }}
             })
             .collect();
 
@@ -146,17 +154,11 @@ impl TestBody {
             .enumerate()
             .map(|(txn_idx, post)| {
                 (
-                    Nibbles::from_bytes_be(&txn_idx.to_be_bytes()).unwrap(),
+                    Nibbles::from_bytes_be(&txn_idx.to_be_bytes()).unwrap(), //TODO: It seems this should be rlp(txn_idx)
                     post.txbytes.0.clone(),
                 )
             })
             .collect()
-    }
-}
-
-impl From<TestBody> for Plonky2ParsedTest {
-    fn from(test_body: TestBody) -> Self {
-        test_body.as_plonky2_test_input()
     }
 }
 
@@ -180,4 +182,13 @@ fn u256_to_be_bytes(x: U256) -> [u8; 32] {
 
 fn hash(bytes: &[u8]) -> H256 {
     H256::from(keccak(bytes).0)
+}
+
+impl BlockchainTestHeader {
+    pub fn as_plonky2_test_input(&self) -> Plonky2ParsedTest {
+        unimplemented!()
+    }
+    pub fn as_serializable_evm_instances(&self) -> Result<Vec<SerializableEVMInstance>>{
+        unimplemented!()
+    }
 }

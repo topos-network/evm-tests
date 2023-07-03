@@ -8,6 +8,7 @@ use std::{
 
 use common::types::TestVariantRunInfo;
 use ethereum_types::H256;
+use eth_trie_utils::partial_trie::{HashedPartialTrie, PartialTrie};
 use futures::executor::block_on;
 use indicatif::{ProgressBar, ProgressStyle};
 use log::trace;
@@ -295,6 +296,8 @@ fn run_test_or_fail_on_timeout(
 /// Run a test against `plonky2` and output a result based on what happens.
 fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
     let timing = TimingTree::new("prove", log::Level::Debug);
+    let transactions_trie = test.gen_inputs.tries.transactions_trie.clone();
+    let state_trie = test.gen_inputs.tries.transactions_trie.clone();
 
     let proof_run_res = prove_with_outputs::<GoldilocksField, KeccakGoldilocksConfig, 2>(
         &AllStark::default(),
@@ -310,7 +313,6 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
         Err(evm_err) => return TestStatus::EvmErr(evm_err.to_string()),
     };
 
-    let actual_state_trie_hash = proof_run_output.public_values.trie_roots_after.state_root;
 
     if verify_proof(
         &AllStark::default(),
@@ -322,7 +324,23 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
         return TestStatus::EvmErr("Proof verification failed.".to_string());
     }
 
-    if actual_state_trie_hash != test.common.expected_final_account_state_root_hash {
+    let actual_state_trie_hash = proof_run_output.public_values.trie_roots_after.state_root;
+    let actual_txn_trie_hash = proof_run_output.public_values.trie_roots_after.transactions_root;
+    println!("the transaction trie = {:?}", transactions_trie);
+    println!("the expected txn hash = {:?}", test.common.expected_final_transactions_root_hash);
+    println!("the actual hash = {:?}", actual_txn_trie_hash);
+    println!("the state trie = {:?}", state_trie);
+    println!("state trie hash = {:?}", state_trie.hash());
+    println!("expected state trie hash = {:?}", test.common.expected_final_account_state_root_hash);
+    // let mut expected_transactions_trie: HashedPartialTrie = Node::Leaf {
+    //     nibbles: Nibbles::from_str("0x80").unwrap(),
+    //     value: test.txn_bytes.0.clone().into_vec()
+    // }
+
+    if
+        actual_state_trie_hash != test.common.expected_final_account_state_root_hash ||
+        actual_txn_trie_hash != test.common.expected_final_transactions_root_hash
+    {
         if let Some(serialized_revm_variant) = test.revm_variant {
             let instance = serialized_revm_variant.into_hydrated();
             let expected_state = instance.transact_ref().map(|result| result.state);
@@ -338,7 +356,10 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
                 actual_state_trie_hash,
                 test.common.expected_final_account_state_root_hash,
             ),
-            receipt: TrieComparisonResult::Correct, // TODO...
+            receipt: TrieComparisonResult::Difference(
+                actual_txn_trie_hash,
+                test.common.expected_final_transactions_root_hash
+            ),
             transaction: TrieComparisonResult::Correct, // TODO...
         };
 
