@@ -1,4 +1,4 @@
-use flexi_logger::Logger;
+use env_logger::{try_init_from_env, Env, DEFAULT_FILTER_ENV};
 
 #[macro_export]
 macro_rules! unwrap_or_continue {
@@ -21,7 +21,5 @@ macro_rules! unwrap_or_return {
 }
 
 pub fn init_env_logger() {
-    let _ = Logger::try_with_env_or_str("plonky2::util::timing=info")
-        .unwrap()
-        .start();
+    let _ = try_init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "info"));
 }

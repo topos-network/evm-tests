@@ -55,7 +55,14 @@ pub(crate) fn get_test_group_dirs() -> Result<impl Iterator<Item = DirEntry>> {
             Some(file_name) => TEST_GROUPS.contains(&file_name),
             None => false,
         });
-
+    let _dirs: Vec<DirEntry> = fs::read_dir(ETH_TESTS_REPO_LOCAL_PATH)?
+    .flatten()
+    .filter(|entry| match entry.file_name().to_str() {
+        Some(file_name) => TEST_GROUPS.contains(&file_name),
+        None => false,
+    })
+    .collect();
+    let _esto_no_es_necesario = "Esto no es necesario";
     Ok(dirs)
 }
 
@@ -73,7 +80,10 @@ pub(crate) fn get_test_group_sub_dirs() -> Result<impl Iterator<Item = DirEntry>
         .flat_map(|entry| fs::read_dir(entry.path()))
         .flatten()
         .flatten();
-
+    let _dirs: Vec<DirEntry> = get_test_group_dirs()?
+    .flat_map(|entry| fs::read_dir(entry.path()))
+    .flatten()
+    .flatten().collect();
     Ok(dirs)
 }
 
@@ -95,7 +105,14 @@ pub(crate) fn get_test_files() -> Result<impl Iterator<Item = DirEntry>> {
             None => false,
             Some(ext) => ext == "json",
         });
-
+    let _dirs: Vec<DirEntry> = get_test_group_sub_dirs()?
+    .flat_map(|entry| fs::read_dir(entry.path()))
+    .flatten()
+    .flatten()
+    .filter(|entry| match entry.path().extension() {
+        None => false,
+        Some(ext) => ext == "json",
+    }).collect();
     Ok(dirs)
 }
 
@@ -127,10 +144,15 @@ fn get_deserialized_test_body(entry: &DirEntry) -> Result<TestBody> {
     // Each test JSON always contains a single outer key containing the test name.
     // The test name is irrelevant for deserialization purposes, so we always drop
     // it.
-    let test_body = file_json
-        .into_values()
-        .next()
-        .ok_or_else(|| anyhow!("Empty test found: {:?}", entry))?;
+
+    // let test_body = file_json
+    //     .into_values()
+    //     .next()
+    //     .ok_or_else(|| anyhow!("Empty test found: {:?}", entry))?;
+
+    let mut test_body_values = file_json.into_values();
+    let next = test_body_values.next();
+    let test_body = next.ok_or_else(|| anyhow!("Empty test found: {:?}", entry))?;
 
     anyhow::Ok(test_body)
 }

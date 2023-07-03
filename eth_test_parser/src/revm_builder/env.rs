@@ -3,7 +3,7 @@ use anyhow::Result;
 use common::config::MATIC_CHAIN_ID;
 use revm::primitives::{BlockEnv, Bytes, CfgEnv, Env, TransactTo, TxEnv};
 
-use crate::deserialize::TestBody;
+use crate::deserialize::GeneralStateTestBody;
 
 struct TxSharedData {
     data: Vec<Bytes>,
@@ -12,7 +12,7 @@ struct TxSharedData {
     value: Vec<ruint::aliases::U256>,
 }
 
-impl TestBody {
+impl GeneralStateTestBody {
     fn try_as_tx_shared_data(&self) -> Result<TxSharedData> {
         let data = self
             .transaction
@@ -130,18 +130,18 @@ impl TestBody {
     }
 }
 
-impl TryFrom<&TestBody> for TxSharedData {
+impl TryFrom<&GeneralStateTestBody> for TxSharedData {
     type Error = anyhow::Error;
 
-    fn try_from(body: &TestBody) -> Result<Self> {
+    fn try_from(body: &GeneralStateTestBody) -> Result<Self> {
         body.try_as_tx_shared_data()
     }
 }
 
-impl TryFrom<&TestBody> for Vec<Env> {
+impl TryFrom<&GeneralStateTestBody> for Vec<Env> {
     type Error = anyhow::Error;
 
-    fn try_from(body: &TestBody) -> Result<Self> {
+    fn try_from(body: &GeneralStateTestBody) -> Result<Self> {
         body.as_revm_env()
     }
 }

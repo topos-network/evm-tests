@@ -1,14 +1,16 @@
 #![allow(dead_code)]
 use std::collections::HashMap;
 use std::str::FromStr;
+use anyhow::Result;
 
+use common::{types::Plonky2ParsedTest, revm::SerializableEVMInstance};
 use ethereum_types::{Address, H160, H256, U256, U512};
 use hex::FromHex;
 use serde::{
     de::{Error, Visitor},
     Deserialize, Deserializer,
 };
-use serde_with::{serde_as, DefaultOnNull, NoneAsEmptyString};
+use serde_with::{serde_as, with_prefix, DefaultOnNull, NoneAsEmptyString};
 
 /// In a couple tests, an entry in the `transaction.value` key will contain
 /// the prefix, `0x:bigint`, in addition to containing a value greater than 256
@@ -165,6 +167,7 @@ pub(crate) struct Transaction {
     pub(crate) gas_limit: Vec<u64>,
     pub(crate) gas_price: Option<U256>,
     pub(crate) nonce: U256,
+    #[serde(default)]
     pub(crate) secret_key: H256,
     pub(crate) sender: H160,
     #[serde_as(as = "NoneAsEmptyString")]
@@ -175,11 +178,90 @@ pub(crate) struct Transaction {
 }
 
 #[derive(Deserialize, Debug)]
-pub(crate) struct TestBody {
+pub(crate) struct GeneralStateTestBody {
     pub(crate) env: Env,
     pub(crate) post: Post,
     pub(crate) transaction: Transaction,
     pub(crate) pre: HashMap<H160, PreAccount>,
+}
+
+/*
+    Strucs for deserializing tests in the BlockchainTest folder
+ */
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BlockHeader {
+    bloom: ByteString,
+    coinbase: U256,
+    difficulty: U256,
+    extra_data: ByteString,
+    #[serde(deserialize_with = "vec_u64_from_hex")]
+    pub(crate) gas_limit: Vec<u64>,
+    gas_used: U256,
+    hash: H256,
+    mix_hash: H256,
+    nonce: U256,
+    number: U256,
+    parent_hash: H256,
+    receip_trie: H256,
+    state_root: H256,
+    timestamp: U256,
+    transactions_trie: H256,
+    uncle_hash: H256
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Block {
+    block_header: BlockHeader,
+    rlp: ByteString,
+    transactions: Vec<Transaction>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BlockchainTestBody {
+    pub(crate) blocks: Vec<Block>,
+    pub(crate) genesis_block_header: Block,
+    pub(crate) genesis_r_l_p: ByteString, // How to get genesis_rlp?,
+    lastblockhash: H256,
+    post_state: HashMap<H160, PreAccount>, // TODOD: oesn't seem correct
+    pre: HashMap<H160, PreAccount>,
+}
+
+#[derive(Deserialize, Debug)]
+pub(crate) struct BlockchainTestHeader {
+    #[serde(rename = "PascalCase", with = "prefix_shangai")]
+    pub(crate) shangai: BlockchainTestBody,
+}
+
+with_prefix!(prefix_shangai "addmodNonConst_d0g0v0_"); //TODO: The prefix is not only comming from addmodNonConst test
+
+// TODO: I wanted to make this a trie, but I run into problems becasue at some point I need to implement impl<T> From<T> for
+// Plonky2ParsedTest, where T: TestBody, and the compiler complains that:
+// error: type parameter `T` must be used as the type parameter for some local type (e.g. `MyStruct<T>`);
+// only traits defined in the current crate can be implemented for a type parameter  
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+pub(crate) enum TestBody {
+    BlockchainTestHeader(BlockchainTestHeader),
+    GeneralStateTestBody(GeneralStateTestBody)
+}
+
+impl TestBody {
+    pub(crate) fn as_plonky2_test_input(&self) -> Plonky2ParsedTest {
+        match self {
+            Self::BlockchainTestHeader(blockchain_test) => blockchain_test.as_plonky2_test_input(),
+            Self::GeneralStateTestBody(general_state_test) => general_state_test.as_plonky2_test_input()
+        }
+    }
+    pub(crate) fn as_serializable_evm_instances(&self) -> Result<Vec<SerializableEVMInstance>, > {
+        match self {
+            Self::BlockchainTestHeader(blockchain_test) => blockchain_test.as_serializable_evm_instances(),
+            Self::GeneralStateTestBody(general_state_test) => general_state_test.as_serializable_evm_instances()
+        }
+    }
 }
 
 #[cfg(test)]
