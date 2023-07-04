@@ -152,6 +152,7 @@ fn get_deserialized_test_body(entry: &DirEntry) -> Result<TestBody> {
 
     let mut test_body_values = file_json.into_values();
     let next = test_body_values.next();
+        
     let test_body = next.ok_or_else(|| anyhow!("Empty test found: {:?}", entry))?;
 
     anyhow::Ok(test_body)
