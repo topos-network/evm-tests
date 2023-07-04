@@ -12,6 +12,7 @@ anyhow = { version = "1.0.66", features = ["backtrace"] }
 ethereum-types = "0.14.0"
 eth_trie_utils = "0.5.0"
 flexi_logger = { version = "0.25.1", features = ["async"] }
+env_logger = "0.10.0"
 plonky2_evm = { path = "../../topos-plonky2/evm" }
 serde = {version = "1.0.147", features = ["derive"] }
 revm = { version = "3.0.0", features = ["serde"] }
