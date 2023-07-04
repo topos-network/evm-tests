@@ -25,7 +25,7 @@ use plonky2_evm::{generation::TrieInputs, proof::BlockMetadata};
 use rlp::Encodable;
 use rlp_derive::{RlpDecodable, RlpEncodable};
 
-use crate::deserialize::{Env, TestBody, GeneralStateTestBody, BlockchainTestHeader};
+use crate::deserialize::{Env, TestBody, GeneralStateTestBody, BlockchainTestBody};
 
 #[derive(RlpDecodable, RlpEncodable)]
 pub(crate) struct AccountRlp {
@@ -184,7 +184,7 @@ fn hash(bytes: &[u8]) -> H256 {
     H256::from(keccak(bytes).0)
 }
 
-impl BlockchainTestHeader {
+impl BlockchainTestBody {
     pub fn as_plonky2_test_input(&self) -> Plonky2ParsedTest {
         unimplemented!()
     }
