@@ -19,6 +19,7 @@ clap = {version = "4.2.7", features = ["derive"] }
 csv = "1.2.1"
 ctrlc = "3.2.5"
 ethereum-types = "0.14.1"
+eth_trie_utils = "0.6.0"
 flexi_logger = { version = "0.25.4", features = ["async"] }
 futures = "0.3"
 humantime = "2.1.0"

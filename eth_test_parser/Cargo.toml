@@ -16,6 +16,7 @@ anyhow = { version = "1.0.71", features = ["backtrace"] }
 clap = {version = "4.2.7", features = ["derive"] }
 ethereum-types = "0.14.1"
 hex = { version = "0.4.3", features = ["serde"] }
+hex-literal = "0.3.4"
 flexi_logger = { version = "0.25.4", features = ["async"] }
 keccak-hash = "0.10.0"
 log = "0.4.17"
