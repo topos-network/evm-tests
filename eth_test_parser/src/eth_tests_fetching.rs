@@ -50,6 +50,7 @@ fn download_remote_tests() {
         TEST_GROUPS.join(", ")
     );
     // sparse-checkout out the relevant test group folders.
+    // TODO: Do the same for BLOCKCHAIN_TEST_GROUPS?
     run_cmd(Command::new("git").args([
         "-C",
         ETH_TESTS_REPO_LOCAL_PATH,

@@ -25,7 +25,7 @@ use plonky2_evm::{generation::TrieInputs, proof::BlockMetadata};
 use rlp::Encodable;
 use rlp_derive::{RlpDecodable, RlpEncodable};
 
-use crate::deserialize::{Env, TestBody, GeneralStateTestBody, BlockchainTestBody};
+use crate::deserialize::{Env, TestBody, GeneralStateTestBody, BlockchainTestBody, BlockHeader};
 
 #[derive(RlpDecodable, RlpEncodable)]
 pub(crate) struct AccountRlp {
@@ -50,59 +50,6 @@ impl Env {
 }
 
 impl GeneralStateTestBody {
-    pub fn as_plonky2_test_input(&self) -> Plonky2ParsedTest {
-        let storage_tries = self.get_storage_tries();
-        let state_trie = self.get_state_trie(&storage_tries);
-        let mut transactions_trie = HashedPartialTrie::default();
-
-        let tries = TrieInputs {
-            state_trie,
-            transactions_trie: HashedPartialTrie::default(), // TODO: Is it ok to start with the empty trie?
-            receipts_trie: HashedPartialTrie::default(), /* TODO: Fill in once we know what we
-                                                          * are
-                                                          * doing... */
-            storage_tries,
-        };
-
-        let contract_code: HashMap<_, _> = self
-            .pre
-            .values()
-            .map(|pre| (hash(&pre.code.0), pre.code.0.clone()))
-            .collect();
-
-        let test_variants = self
-            .post
-            .shanghai
-            .iter()
-            .enumerate()
-            .map(|(txn_idx,x)| {
-                transactions_trie.insert(
-                    Nibbles::from_bytes_be(&<usize as Into<U256>>::into(txn_idx).rlp_bytes()).unwrap(), // TODO: There's probably a cleaner way for doing this
-                    x.txbytes.0.clone()
-                );
-                TestVariant {
-                    txn_bytes: x.txbytes.0.clone(),
-                    common: TestVariantCommon {
-                        expected_final_account_state_root_hash: x.hash,
-                        expected_final_transactions_root_hash: transactions_trie.hash()
-                }}
-            })
-            .collect();
-
-        let addresses = self.pre.keys().copied().collect::<Vec<Address>>();
-
-        let const_plonky2_inputs = ConstGenerationInputs {
-            tries,
-            contract_code,
-            block_metadata: self.env.block_metadata(),
-            addresses,
-        };
-
-        Plonky2ParsedTest {
-            test_variants,
-            const_plonky2_inputs,
-        }
-    }
 
     fn get_storage_tries(&self) -> Vec<(H256, HashedPartialTrie)> {
         self.pre
@@ -184,11 +131,65 @@ fn hash(bytes: &[u8]) -> H256 {
     H256::from(keccak(bytes).0)
 }
 
-impl BlockchainTestBody {
-    pub fn as_plonky2_test_input(&self) -> Plonky2ParsedTest {
-        unimplemented!()
+impl BlockHeader {
+    fn block_metadata(&self) -> BlockMetadata {
+        BlockMetadata {
+            block_beneficiary: self.coinbase,
+            block_timestamp: self.timestamp,
+            block_number: self.number,
+            block_difficulty: self.difficulty,
+            block_gaslimit: self.gas_limit,
+            block_chain_id: config::ETHEREUM_CHAIN_ID.into(),
+            block_base_fee: self.base_fee_per_gas,
+        }
     }
-    pub fn as_serializable_evm_instances(&self) -> Result<Vec<SerializableEVMInstance>>{
-        unimplemented!()
+}
+
+pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBody, blockchain_test_body: &BlockchainTestBody) -> Plonky2ParsedTest {
+    let storage_tries = general_state_test_body.get_storage_tries();
+    let state_trie = general_state_test_body.get_state_trie(&storage_tries);
+
+    let tries = TrieInputs {
+        state_trie,
+        transactions_trie: HashedPartialTrie::default(), // TODO: Is it ok to start with the empty trie?
+        receipts_trie: HashedPartialTrie::default(), /* TODO: Fill in once we know what we
+                                                        * are
+                                                        * doing... */
+        storage_tries,
+    };
+
+    let contract_code: HashMap<_, _> = general_state_test_body
+        .pre
+        .values()
+        .map(|pre| (hash(&pre.code.0), pre.code.0.clone()))
+        .collect();
+
+    let test_variants = general_state_test_body
+        .post
+        .shanghai
+        .iter()
+        .map(|x| {
+            TestVariant {
+                txn_bytes: x.txbytes.0.clone(),
+                common: TestVariantCommon {
+                    expected_final_account_state_root_hash: x.hash,
+                    // TODO: transaction trie shouldn't change with variants?
+                    expected_final_transactions_root_hash: blockchain_test_body.blocks[0].block_header.transactions_trie
+            }}
+        })
+        .collect();
+
+    let addresses = general_state_test_body.pre.keys().copied().collect::<Vec<Address>>();
+
+    let const_plonky2_inputs = ConstGenerationInputs {
+        tries,
+        contract_code,
+        block_metadata: general_state_test_body.env.block_metadata(),
+        addresses,
+    };
+
+    Plonky2ParsedTest {
+        test_variants,
+        const_plonky2_inputs,
     }
 }

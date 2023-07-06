@@ -7,10 +7,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Result, bail};
 use common::config::GENERATION_INPUTS_DEFAULT_OUTPUT_DIR;
+use plonky2_evm::proof::BlockMetadataTarget;
 
-use crate::config::{ETH_TESTS_REPO_LOCAL_PATH, TEST_GROUPS};
+use crate::{config::{ETH_TESTS_REPO_LOCAL_PATH, TEST_GROUPS, BLOCKCHAIN_TEST_DIR}, deserialize::{GeneralStateTestBody, BlockchainTestBody}};
 use crate::deserialize::TestBody;
 
 /// Get the default parsed test output directory.
@@ -48,21 +49,13 @@ pub(crate) fn get_default_out_dir() -> anyhow::Result<PathBuf> {
 /// // │   ├── {test_case_1}.json
 /// // │   └── {test_case_n}.json
 /// ```
-pub(crate) fn get_test_group_dirs() -> Result<impl Iterator<Item = DirEntry>> {
-    let dirs = fs::read_dir(ETH_TESTS_REPO_LOCAL_PATH)?
+pub(crate) fn get_test_group_dirs<const N: usize>(sub_dir: &str, test_groups: &'static [&str; N]) -> Result<impl Iterator<Item = DirEntry>> {
+    let dirs = fs::read_dir(ETH_TESTS_REPO_LOCAL_PATH.to_owned() + "/" + sub_dir)?
         .flatten()
         .filter(|entry| match entry.file_name().to_str() {
-            Some(file_name) => TEST_GROUPS.contains(&file_name),
+            Some(file_name) => test_groups.contains(&file_name),
             None => false,
         });
-    let _dirs: Vec<DirEntry> = fs::read_dir(ETH_TESTS_REPO_LOCAL_PATH)?
-    .flatten()
-    .filter(|entry| match entry.file_name().to_str() {
-        Some(file_name) => TEST_GROUPS.contains(&file_name),
-        None => false,
-    })
-    .collect();
-    let _esto_no_es_necesario = "Esto no es necesario";
     Ok(dirs)
 }
 
@@ -75,15 +68,11 @@ pub(crate) fn get_test_group_dirs() -> Result<impl Iterator<Item = DirEntry>> {
 /// // │   ├── {test_case_1}.json
 /// // │   └── {test_case_n}.json
 /// ```
-pub(crate) fn get_test_group_sub_dirs() -> Result<impl Iterator<Item = DirEntry>> {
-    let dirs = get_test_group_dirs()?
+pub(crate) fn get_test_group_sub_dirs<const N: usize>(sub_dir: &str, test_group: &'static [&str; N]) -> Result<impl Iterator<Item = DirEntry>> {
+    let dirs = get_test_group_dirs(sub_dir, test_group)?
         .flat_map(|entry| fs::read_dir(entry.path()))
         .flatten()
         .flatten();
-    let _dirs: Vec<DirEntry> = get_test_group_dirs()?
-    .flat_map(|entry| fs::read_dir(entry.path()))
-    .flatten()
-    .flatten().collect();
     Ok(dirs)
 }
 
@@ -96,8 +85,8 @@ pub(crate) fn get_test_group_sub_dirs() -> Result<impl Iterator<Item = DirEntry>
 /// // │   ├── {test_case_1}.json  <--- HERE
 /// // │   └── {test_case_n}.json
 /// ```
-pub(crate) fn get_test_files() -> Result<impl Iterator<Item = DirEntry>> {
-    let dirs = get_test_group_sub_dirs()?
+pub(crate) fn get_test_files() -> Result<impl Iterator<Item = (DirEntry, DirEntry)>> {
+    let dirs_general_state_tests = get_test_group_sub_dirs(&"", &TEST_GROUPS)?
         .flat_map(|entry| fs::read_dir(entry.path()))
         .flatten()
         .flatten()
@@ -105,7 +94,9 @@ pub(crate) fn get_test_files() -> Result<impl Iterator<Item = DirEntry>> {
             None => false,
             Some(ext) => ext == "json",
         });
-    let _dirs: Vec<DirEntry> = get_test_group_sub_dirs()?
+
+    // Alonso del futuro: Este zip debe ser mejor hacerlo cuando se llama a get_test_files agregando el argumento path a get_test_files
+    let dirs_blockchain_tests: Vec<DirEntry> = get_test_group_sub_dirs(&BLOCKCHAIN_TEST_DIR, &TEST_GROUPS)?
     .flat_map(|entry| fs::read_dir(entry.path()))
     .flatten()
     .flatten()
@@ -113,15 +104,19 @@ pub(crate) fn get_test_files() -> Result<impl Iterator<Item = DirEntry>> {
         None => false,
         Some(ext) => ext == "json",
     }).collect();
-    Ok(dirs)
+    Ok(dirs_general_state_tests.zip(dirs_blockchain_tests))
 }
 
 /// Create output directories mirroring the structure of source test
 /// directories.
 pub(crate) fn prepare_output_dir(out_path: &Path) -> Result<()> {
-    for dir in get_test_group_sub_dirs()? {
+    for dir in get_test_group_sub_dirs("", &TEST_GROUPS)? {
         fs::create_dir_all(out_path.join(dir.path().strip_prefix(ETH_TESTS_REPO_LOCAL_PATH)?))?
     }
+    // Do the same for blockchain tests?
+    // for dir in get_test_group_sub_dirs(&BLOCKCHAIN_TEST_DIR)? {
+    //     fs::create_dir_all(out_path.join(dir.path().strip_prefix(ETH_TESTS_REPO_LOCAL_PATH)?))?
+    // }
 
     Ok(())
 }
@@ -129,31 +124,35 @@ pub(crate) fn prepare_output_dir(out_path: &Path) -> Result<()> {
 /// Generate an iterator containing the deserialized test bodies (`TestBody`)
 /// and their `DirEntry`s.
 pub(crate) fn get_deserialized_test_bodies(
-) -> Result<impl Iterator<Item = Result<(DirEntry, TestBody), (String, String)>>> {
-    Ok(get_test_files()?.map(|entry| {
-        let test_body = get_deserialized_test_body(&entry)
-            .map_err(|err| (err.to_string(), entry.path().to_string_lossy().to_string()))?;
-        Ok((entry, test_body))
+) -> Result<impl Iterator<Item = Result<((DirEntry, GeneralStateTestBody),(DirEntry, BlockchainTestBody)), (String, String)>>> {
+    Ok(get_test_files()?.map(|(general_state_test, blockchain_test)| {
+        let general_state_test_body = get_deserialized_general_state_test_body(&general_state_test)
+            .map_err(|err| (err.to_string(), general_state_test.path().to_string_lossy().to_string()))?;
+        let blockchain_test_body = get_deserialized_blockchain_test_body(&blockchain_test)
+            .map_err(|err| (err.to_string(), blockchain_test.path().to_string_lossy().to_string()))?;
+        Ok(((general_state_test, general_state_test_body),(blockchain_test, blockchain_test_body)))
     }))
 }
 
-fn get_deserialized_test_body(entry: &DirEntry) -> Result<TestBody> {
+fn get_deserialized_general_state_test_body(entry: &DirEntry) -> Result<GeneralStateTestBody> {
     let buf = BufReader::new(File::open(entry.path())?);
-    let file_json: HashMap<String, TestBody> = serde_json::from_reader(buf)?;
-
-    // Each test JSON always contains a single outer key containing the test name.
-    // The test name is irrelevant for deserialization purposes, so we always drop
-    // it.
-
-    // let test_body = file_json
-    //     .into_values()
-    //     .next()
-    //     .ok_or_else(|| anyhow!("Empty test found: {:?}", entry))?;
-
+    let file_json: HashMap<String, GeneralStateTestBody> = serde_json::from_reader(buf)?;
+   
     let mut test_body_values = file_json.into_values();
     let next = test_body_values.next();
-        
     let test_body = next.ok_or_else(|| anyhow!("Empty test found: {:?}", entry))?;
 
     anyhow::Ok(test_body)
+}
+
+fn get_deserialized_blockchain_test_body(entry: &DirEntry) -> Result<BlockchainTestBody> {
+    let buf = BufReader::new(File::open(entry.path())?);
+    let file_json: HashMap<String, BlockchainTestBody> = serde_json::from_reader(buf)?;
+   
+    for (k, v) in file_json.into_iter() {
+        if k.ends_with("_Shanghai") {
+            return  anyhow::Ok(v)
+        }
+    }
+    bail!("Could'n deserialize blochckain test")
 }
