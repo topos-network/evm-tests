@@ -41,7 +41,7 @@ where
         .collect()
 }
 
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug, Default)]
 // "self" just points to this module.
 pub(crate) struct ByteString(#[serde(with = "self")] pub(crate) Vec<u8>);
 
@@ -210,44 +210,49 @@ pub(crate) struct GeneralStateTestBody {
     Strucs for deserializing tests in the BlockchainTest folder
  */
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BlockHeader {
-    bloom: ByteString,
-    coinbase: U256,
-    difficulty: U256,
-    extra_data: ByteString,
-    gas_limit: U256,
-    gas_used: U256,
-    hash: H256,
-    mix_hash: H256,
-    nonce: U256,
-    number: U256,
-    parent_hash: H256,
-    receipt_trie: H256,
-    state_root: H256,
-    timestamp: U256,
-    transactions_trie: H256,
-    uncle_hash: H256
+    #[serde(default)]
+    pub(crate) base_fee_per_gas: U256,
+    pub(crate) bloom: ByteString,
+    pub(crate) coinbase: H160,
+    pub(crate) difficulty: U256,
+    pub(crate) extra_data: ByteString,
+    pub(crate) gas_limit: U256,
+    pub(crate) gas_used: U256,
+    pub(crate) hash: H256,
+    pub(crate) mix_hash: H256,
+    pub(crate) nonce: U256,
+    pub(crate) number: U256,
+    pub(crate) parent_hash: H256,
+    pub(crate) receipt_trie: H256,
+    pub(crate) state_root: H256,
+    pub(crate) timestamp: U256,
+    pub(crate) transactions_trie: H256,
+    pub(crate) uncle_hash: H256
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Block {
-    block_header: BlockHeader,
-    rlp: ByteString,
-    transactions: Vec<TransactionBlockchainTest>,
+    #[serde(default)]
+    pub(crate) block_header: BlockHeader,
+    pub(crate) rlp: ByteString,
+    #[serde(default)]
+    pub(crate) transactions: Vec<TransactionBlockchainTest>,
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BlockchainTestBody {
-    blocks: Vec<Block>,
-    genesis_block_header: BlockHeader,
-    genesis_r_l_p: ByteString, // How to make it genesis_rlp?,
-    lastblockhash: H256,
-    post_state: HashMap<H160, PreAccount>, // TODO: Doesn't seem correct
-    pre: HashMap<H160, PreAccount>,
+    pub(crate) blocks: Vec<Block>,
+    pub(crate) genesis_block_header: BlockHeader,
+    pub(crate) genesis_r_l_p: ByteString, // How to make it genesis_rlp?,
+    pub(crate) lastblockhash: H256,
+    #[serde(default)]
+    pub(crate) post_state: HashMap<H160, PreAccount>, // TODO: Doesn't seem correct
+    pub(crate) pre: HashMap<H160, PreAccount>,
 }
 
 // TODO: I wanted to make this a trie, but I run into problems becasue at some point I need to implement impl<T> From<T> for
@@ -258,21 +263,6 @@ pub(crate) struct BlockchainTestBody {
 pub(crate) enum TestBody {
     BlockchainTestBody(BlockchainTestBody),
     GeneralStateTestBody(GeneralStateTestBody)
-}
-
-impl TestBody {
-    pub(crate) fn as_plonky2_test_input(&self) -> Plonky2ParsedTest {
-        match self {
-            Self::BlockchainTestBody(blockchain_test) => blockchain_test.as_plonky2_test_input(),
-            Self::GeneralStateTestBody(general_state_test) => general_state_test.as_plonky2_test_input()
-        }
-    }
-    pub(crate) fn as_serializable_evm_instances(&self) -> Result<Vec<SerializableEVMInstance>, > {
-        match self {
-            Self::BlockchainTestBody(blockchain_test) => blockchain_test.as_serializable_evm_instances(),
-            Self::GeneralStateTestBody(general_state_test) => general_state_test.as_serializable_evm_instances()
-        }
-    }
 }
 
 struct TestBodyVisitor {
@@ -323,6 +313,8 @@ impl<'de> Deserialize<'de> for TestBody {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs::File, io::BufReader};
+
     use ethereum_types::{U256, H256};
     use hex_literal::hex;
     use super::{ByteString, TestBody, Block};
@@ -609,6 +601,8 @@ mod tests {
     }]
     ";
 
+    const FILE_PATH: &str = "../eth_tests/BlockchainTests/GeneralStateTests/stArgsZeroOneBalance/addmodNonConst.json";
+
     #[test]
     fn deserialize_hex_str_works() {
         let byte_str: ByteString = serde_json::from_str(TEST_HEX_STR).unwrap();
@@ -641,4 +635,15 @@ mod tests {
             panic!()
         }
     }
+
+    // #[test]
+    // fn deserialize_blockchain_test_from_file() {
+    //     let buf = BufReader::new(File::open(FILE_PATH));
+    //     if let TestBody::BlockchainTestBody(body) = serde_json::from_reader(buf)? {
+    //         assert_eq!(body.blocks[0].block_header.gas_limit, U256::from(0x0f4240));
+    //         assert_eq!(body.genesis_block_header.gas_limit, U256::from(0x0f4240));
+    //         return
+    //     }
+    //     panic!()  
+    // }
 }

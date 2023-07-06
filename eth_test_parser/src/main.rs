@@ -11,7 +11,7 @@ use futures::future::join_all;
 use log::warn;
 
 use crate::fs_scaffolding::{get_default_out_dir, get_deserialized_test_bodies};
-use crate::{config::ETH_TESTS_REPO_LOCAL_PATH, eth_tests_fetching::clone_or_update_remote_tests};
+use crate::{config::ETH_TESTS_REPO_LOCAL_PATH, eth_tests_fetching::clone_or_update_remote_tests, trie_builder::as_plonky2_test_input};
 
 mod arg_parsing;
 mod config;
@@ -45,14 +45,17 @@ async fn run(ProgArgs { no_fetch, out_path }: ProgArgs) -> anyhow::Result<()> {
 
     let generation_input_handles = get_deserialized_test_bodies()?.filter_map(|res| {
         match res {
-            Ok((test_dir_entry, test_body)) => Some(tokio::task::spawn_blocking(move || {
-                let parsed_test = test_body.as_plonky2_test_input();
-                let revm_variants = match test_body.as_serializable_evm_instances() {
+            Ok((
+                (state_test_dir_entry, state_test_body),
+                (blockchain_test_dir_entry, blockchain_test_body)
+            )) => Some(tokio::task::spawn_blocking(move || {
+                let parsed_test = as_plonky2_test_input(&state_test_body, &blockchain_test_body);
+                let revm_variants = match state_test_body.as_serializable_evm_instances() {
                     Ok(revm_variants) => Some(revm_variants),
                     Err(err) => {
                         warn!(
                             "Unable to generate evm instance for test {} due to error: {}. Skipping!",
-                            test_dir_entry.path().display(),
+                            state_test_dir_entry.path().display(),
                             err
                         );
                         None
@@ -64,7 +67,7 @@ async fn run(ProgArgs { no_fetch, out_path }: ProgArgs) -> anyhow::Result<()> {
                     revm_variants,
                 };
 
-                (test_dir_entry, serde_cbor::to_vec(&test_manifest).unwrap())
+                (state_test_dir_entry, serde_cbor::to_vec(&test_manifest).unwrap())
             })),
             Err((err, path_str)) => {
                 // Skip any errors in parsing a test. As the upstream repo changes, we may get

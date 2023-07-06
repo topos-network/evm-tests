@@ -105,7 +105,7 @@ pub struct Plonky2ParsedTest {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct TestVariant {
     /// The txn bytes for each txn in the test.
-    pub txn_bytes: Vec<u8>,
+    pub txn_bytes: Vec<u8>, // TODO: it seems that all transactions are the same in txn variants?
     pub common: TestVariantCommon,
 }
 
