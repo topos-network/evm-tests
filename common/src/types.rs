@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Context};
-use ethereum_types::{Address, H256};
+use ethereum_types::{Address, H256, U256};
 use plonky2_evm::{
     generation::{GenerationInputs, TrieInputs},
     proof::BlockMetadata,
@@ -72,6 +72,9 @@ impl ParsedTestManifest {
                         .block_metadata
                         .clone(),
                     addresses: self.plonky2_variants.const_plonky2_inputs.addresses.clone(),
+                    txn_number_before: U256::zero(), // TODO: Is it always the case?
+                    gas_used_before: self.plonky2_variants.const_plonky2_inputs.gas_used_before,
+                    block_bloom_before: self.plonky2_variants.const_plonky2_inputs.block_bloom_before,
                 };
 
                 TestVariantRunInfo {
@@ -105,7 +108,7 @@ pub struct Plonky2ParsedTest {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct TestVariant {
     /// The txn bytes for each txn in the test.
-    pub txn_bytes: Vec<u8>, // TODO: it seems that all transactions are the same in txn variants?
+    pub txn_bytes: Vec<u8>,
     pub common: TestVariantCommon,
 }
 
@@ -121,8 +124,8 @@ pub struct TestVariantRunInfo {
 pub struct TestVariantCommon {
     /// The root hash of the expected final state trie.
     pub expected_final_account_state_root_hash: H256,
-    // /// The root hash of the expected final transactions trie.
-    // pub expected_final_transactions_root_hash: H256,
+    /// The root hash of the expected final transactions trie.
+    pub expected_final_transactions_root_hash: H256,
     /// The root hash of the expected final receipt trie.
     pub expected_final_receipt_root_hash: H256,
 }
@@ -133,6 +136,8 @@ pub struct ConstGenerationInputs {
     pub contract_code: HashMap<H256, Vec<u8>>,
     pub block_metadata: BlockMetadata,
     pub addresses: Vec<Address>,
+    pub gas_used_before: U256,
+    pub block_bloom_before: [U256; 8]
 }
 
 #[derive(Clone, Debug)]

@@ -310,7 +310,10 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
     };
 
     let actual_state_trie_hash = proof_run_output.public_values.trie_roots_after.state_root;
+    let actual_transactions_trie_hash = proof_run_output.public_values.trie_roots_after.transactions_root;
     let actual_receipt_trie_hash = proof_run_output.public_values.trie_roots_after.receipts_root;
+    println!("the expected txn hash = {:?}", test.common.expected_final_transactions_root_hash);
+    println!("the txn hash = {:?}", actual_transactions_trie_hash);
     println!("the expected receipt hash = {:?}", test.common.expected_final_receipt_root_hash);
     println!("the receipt hash = {:?}", actual_receipt_trie_hash);
     println!("state trie hash = {:?}", actual_state_trie_hash);
@@ -322,7 +325,12 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
 
     if
         actual_state_trie_hash != test.common.expected_final_account_state_root_hash ||
-        actual_receipt_trie_hash != test.common.expected_final_receipt_root_hash
+        // TODO: Is it true that only/always the first variant is consistent with blockchain tests?
+        // test.gen_inputs.signed_txns ==  &&
+        (
+            actual_transactions_trie_hash != test.common.expected_final_transactions_root_hash ||
+            actual_receipt_trie_hash != test.common.expected_final_receipt_root_hash
+        )
     {
         if let Some(serialized_revm_variant) = test.revm_variant {
             let instance = serialized_revm_variant.into_hydrated();
@@ -343,7 +351,10 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
                 actual_receipt_trie_hash,
                 test.common.expected_final_receipt_root_hash
             ),
-            transaction: TrieComparisonResult::Correct, // TODO...
+            transaction: TrieComparisonResult::Difference(
+                actual_transactions_trie_hash,
+                test.common.expected_final_transactions_root_hash
+            ),
         };
 
         return TestStatus::IncorrectAccountFinalState(trie_diff);
