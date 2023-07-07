@@ -296,7 +296,6 @@ fn run_test_or_fail_on_timeout(
 /// Run a test against `plonky2` and output a result based on what happens.
 fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
     let timing = TimingTree::new("prove", log::Level::Debug);
-    let state_trie = test.gen_inputs.tries.state_trie.clone();
 
     let proof_run_res = prove_with_outputs::<GoldilocksField, KeccakGoldilocksConfig, 2>(
         &AllStark::default(),
@@ -324,10 +323,10 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
     }
 
     let actual_state_trie_hash = proof_run_output.public_values.trie_roots_after.state_root;
-    let actual_txn_trie_hash = proof_run_output.public_values.trie_roots_after.transactions_root;
-    println!("the expected txn hash = {:?}", test.common.expected_final_transactions_root_hash);
-    println!("the actual hash = {:?}", actual_txn_trie_hash);
-    println!("state trie hash = {:?}", state_trie.hash());
+    let actual_receipt_trie_hash = proof_run_output.public_values.trie_roots_after.receipts_root;
+    println!("the expected receipt hash = {:?}", test.common.expected_final_receipt_root_hash);
+    println!("the receipt hash = {:?}", actual_receipt_trie_hash);
+    println!("state trie hash = {:?}", actual_state_trie_hash);
     println!("expected state trie hash = {:?}", test.common.expected_final_account_state_root_hash);
     // let mut expected_transactions_trie: HashedPartialTrie = Node::Leaf {
     //     nibbles: Nibbles::from_str("0x80").unwrap(),
@@ -336,7 +335,7 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
 
     if
         actual_state_trie_hash != test.common.expected_final_account_state_root_hash ||
-        actual_txn_trie_hash != test.common.expected_final_transactions_root_hash
+        actual_receipt_trie_hash != test.common.expected_final_receipt_root_hash
     {
         if let Some(serialized_revm_variant) = test.revm_variant {
             let instance = serialized_revm_variant.into_hydrated();
@@ -354,8 +353,8 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
                 test.common.expected_final_account_state_root_hash,
             ),
             receipt: TrieComparisonResult::Difference(
-                actual_txn_trie_hash,
-                test.common.expected_final_transactions_root_hash
+                actual_receipt_trie_hash,
+                test.common.expected_final_receipt_root_hash
             ),
             transaction: TrieComparisonResult::Correct, // TODO...
         };

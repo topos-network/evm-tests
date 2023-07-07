@@ -121,7 +121,10 @@ pub struct TestVariantRunInfo {
 pub struct TestVariantCommon {
     /// The root hash of the expected final state trie.
     pub expected_final_account_state_root_hash: H256,
-    pub expected_final_transactions_root_hash: H256,
+    // /// The root hash of the expected final transactions trie.
+    // pub expected_final_transactions_root_hash: H256,
+    /// The root hash of the expected final receipt trie.
+    pub expected_final_receipt_root_hash: H256,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
