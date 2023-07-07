@@ -2,9 +2,8 @@
 use std::{marker::PhantomData, fmt};
 use std::collections::HashMap;
 use std::str::FromStr;
-use anyhow::Result;
+use anyhow::{Result, bail};
 
-use common::{types::Plonky2ParsedTest, revm::SerializableEVMInstance};
 use ethereum_types::{Address, H160, H256, U256, U512};
 use hex::FromHex;
 use serde::de::MapAccess;
@@ -12,7 +11,7 @@ use serde::{
     de::{Error, Visitor},
     Deserialize, Deserializer,
 };
-use serde_with::{serde_as, with_prefix, DefaultOnNull, NoneAsEmptyString};
+use serde_with::{serde_as, DefaultOnNull, NoneAsEmptyString};
 
 /// In a couple tests, an entry in the `transaction.value` key will contain
 /// the prefix, `0x:bigint`, in addition to containing a value greater than 256
@@ -40,7 +39,6 @@ where
         })
         .collect()
 }
-
 #[derive(Clone, Deserialize, Debug, Default)]
 // "self" just points to this module.
 pub(crate) struct ByteString(#[serde(with = "self")] pub(crate) Vec<u8>);
@@ -98,6 +96,30 @@ where
         .map(|x| u64::from_str_radix(&x[2..], 16).map_err(D::Error::custom))
         .collect::<Result<Vec<_>, D::Error>>()
 }
+
+// For deserializing bloom filters
+fn vec_u256_from_hex<'de, D>(deserializer: D) -> Result<[U256; 8], D::Error>
+where
+    D: Deserializer<'de>
+{
+    let str: String = Deserialize::deserialize(deserializer)?;
+    let el_valor: Result<Vec<_>, D::Error> = str[2..].chars().collect::<Vec<char>>()
+        .chunks(64)
+        .map(|str|
+            U256::from_str_radix(&str.iter().collect::<String>()[..], 16).map_err(D::Error::custom)
+        )
+        .collect();
+    if let Ok(el_valor) = el_valor {
+        if el_valor.len() < 8 {
+            return Err(D::Error::custom("Field bloom too short"))
+        }
+        else{
+            return Ok([el_valor[0], el_valor[1], el_valor[2], el_valor[3], el_valor[4], el_valor[5], el_valor[6], el_valor[7]])
+        }
+    }
+    Err(D::Error::custom("Invalid bloom field"))
+}
+
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -215,7 +237,8 @@ pub(crate) struct GeneralStateTestBody {
 pub(crate) struct BlockHeader {
     #[serde(default)]
     pub(crate) base_fee_per_gas: U256,
-    pub(crate) bloom: ByteString,
+    #[serde(deserialize_with = "vec_u256_from_hex")]
+    pub(crate) bloom: [U256; 8],
     pub(crate) coinbase: H160,
     pub(crate) difficulty: U256,
     pub(crate) extra_data: ByteString,

@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use futures::executor::block_on;
 use plonky2_evm::Node;
 
 use anyhow::Result;
@@ -36,7 +37,7 @@ pub(crate) struct AccountRlp {
 }
 
 impl Env {
-    fn block_metadata(&self) -> BlockMetadata {
+    fn block_metadata(&self, block_bloom: [U256; 8]) -> BlockMetadata {
         BlockMetadata {
             block_beneficiary: self.current_coinbase,
             block_timestamp: self.current_timestamp,
@@ -45,6 +46,7 @@ impl Env {
             block_gaslimit: self.current_gas_limit,
             block_chain_id: config::ETHEREUM_CHAIN_ID.into(),
             block_base_fee: self.current_base_fee,
+            block_bloom
         }
     }
 }
@@ -131,20 +133,6 @@ fn hash(bytes: &[u8]) -> H256 {
     H256::from(keccak(bytes).0)
 }
 
-impl BlockHeader {
-    fn block_metadata(&self) -> BlockMetadata {
-        BlockMetadata {
-            block_beneficiary: self.coinbase,
-            block_timestamp: self.timestamp,
-            block_number: self.number,
-            block_difficulty: self.difficulty,
-            block_gaslimit: self.gas_limit,
-            block_chain_id: config::ETHEREUM_CHAIN_ID.into(),
-            block_base_fee: self.base_fee_per_gas,
-        }
-    }
-}
-
 pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBody, blockchain_test_body: &BlockchainTestBody) -> Plonky2ParsedTest {
     let storage_tries = general_state_test_body.get_storage_tries();
     let state_trie = general_state_test_body.get_state_trie(&storage_tries);
@@ -174,17 +162,22 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
                 common: TestVariantCommon {
                     expected_final_account_state_root_hash: x.hash,
                     // TODO: transaction trie shouldn't change with variants?
-                    expected_final_transactions_root_hash: blockchain_test_body.blocks[0].block_header.transactions_trie
+                    // expected_final_transactions_root_hash: blockchain_test_body.blocks[0].block_header.transactions_trie,
+                    expected_final_receipt_root_hash: blockchain_test_body.blocks[0].block_header.receipt_trie
+
             }}
         })
         .collect();
 
     let addresses = general_state_test_body.pre.keys().copied().collect::<Vec<Address>>();
 
+    if blockchain_test_body.blocks[0].block_header.bloom.len() < 1 {
+        println!("el test con state hash = {:?}", general_state_test_body.post.shanghai[0].hash)
+    }
     let const_plonky2_inputs = ConstGenerationInputs {
         tries,
         contract_code,
-        block_metadata: general_state_test_body.env.block_metadata(),
+        block_metadata: general_state_test_body.env.block_metadata(blockchain_test_body.blocks[0].block_header.bloom),
         addresses,
     };
 
