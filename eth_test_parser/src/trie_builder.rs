@@ -6,10 +6,6 @@
 //! crate::deserialize::TestBody -> plonky2_evm::generation::GenerationInputs
 //! ```
 use std::collections::HashMap;
-use std::str::FromStr;
-
-use futures::executor::block_on;
-use plonky2_evm::Node;
 
 use anyhow::Result;
 use common::{
@@ -22,11 +18,12 @@ use eth_trie_utils::{
 };
 use ethereum_types::{Address, H256, U256};
 use keccak_hash::keccak;
-use plonky2_evm::{generation::TrieInputs, proof::BlockMetadata};
+use plonky2_evm::{generation::{TrieInputs, mpt::LegacyTransactionRlp}, proof::BlockMetadata};
 use rlp::Encodable;
 use rlp_derive::{RlpDecodable, RlpEncodable};
+use hex_literal::hex;
 
-use crate::deserialize::{Env, TestBody, GeneralStateTestBody, BlockchainTestBody, BlockHeader};
+use crate::deserialize::{Env, GeneralStateTestBody, BlockchainTestBody, BlockHeader};
 
 #[derive(RlpDecodable, RlpEncodable)]
 pub(crate) struct AccountRlp {
@@ -158,8 +155,18 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
         .shanghai
         .iter()
         .map(|x| {
+            let txn: LegacyTransactionRlp = rlp::decode(&x.txbytes.0).expect(
+                &format!("Couldn't decode transaction {:?}", x.txbytes.0)
+            );
+            let string = hex::encode(&x.txbytes.0);
+            // Check if the signature of the current transaction coincides with the in the blockchain test
+            let is_blockchain = blockchain_test_body.blocks[0].transactions.len() > 0 && // There are some tests with empty transactions field (e.g. eth_tests/GeneralStateTests/stEIP3607/transactionCollidingWithNonEmptyAccount_send.jso)
+                txn.r == blockchain_test_body.blocks[0].transactions[0].r &&
+                txn.s == blockchain_test_body.blocks[0].transactions[0].s &&
+                txn.v == blockchain_test_body.blocks[0].transactions[0].v;
             TestVariant {
                 txn_bytes: x.txbytes.0.clone(),
+                is_blockchain,
                 common: TestVariantCommon {
                     expected_final_account_state_root_hash: x.hash,
                     // TODO: transaction trie shouldn't change with variants?
@@ -181,8 +188,7 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
         ),
         addresses,
         gas_used_before: blockchain_test_body.genesis_block_header.gas_used,
-        block_bloom_before: blockchain_test_body.genesis_block_header.bloom,
-        //blockchain_txn: blockchain_test_body.blocks[0].transactions[0]
+        block_bloom_before: blockchain_test_body.genesis_block_header.bloom
     };
 
     Plonky2ParsedTest {

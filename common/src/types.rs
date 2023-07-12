@@ -76,12 +76,14 @@ impl ParsedTestManifest {
                     gas_used_before: self.plonky2_variants.const_plonky2_inputs.gas_used_before,
                     block_bloom_before: self.plonky2_variants.const_plonky2_inputs.block_bloom_before,
                 };
+                let is_blockchain = t_var.is_blockchain;
 
                 TestVariantRunInfo {
                     gen_inputs,
                     common: t_var.common,
                     revm_variant,
                     variant_idx,
+                    is_blockchain
                 }
             })
             .collect();
@@ -109,6 +111,8 @@ pub struct Plonky2ParsedTest {
 pub struct TestVariant {
     /// The txn bytes for each txn in the test.
     pub txn_bytes: Vec<u8>,
+    /// True if this variant transaction matches the one in the corresponding Blockchain test
+    pub is_blockchain: bool,
     pub common: TestVariantCommon,
 }
 
@@ -118,6 +122,7 @@ pub struct TestVariantRunInfo {
     pub common: TestVariantCommon,
     pub revm_variant: Option<SerializableEVMInstance>,
     pub variant_idx: usize,
+    pub is_blockchain: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -137,7 +142,7 @@ pub struct ConstGenerationInputs {
     pub block_metadata: BlockMetadata,
     pub addresses: Vec<Address>,
     pub gas_used_before: U256,
-    pub block_bloom_before: [U256; 8]
+    pub block_bloom_before: [U256; 8],
 }
 
 #[derive(Clone, Debug)]

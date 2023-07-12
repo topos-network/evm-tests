@@ -4,6 +4,9 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use anyhow::{Result, bail};
 
+use plonky2_evm::generation::mpt::LegacyTransactionRlp;
+
+
 use ethereum_types::{Address, H160, H256, U256, U512};
 use hex::FromHex;
 use serde::de::MapAccess;
@@ -146,7 +149,17 @@ pub(crate) struct PostState {
     pub(crate) hash: H256,
     pub(crate) indexes: PostStateIndexes,
     pub(crate) logs: H256,
+    #[serde(deserialize_with = "check_if_decodes")]
     pub(crate) txbytes: ByteString,
+}
+
+fn check_if_decodes<'de, D>(deserializer: D) -> Result<ByteString, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let txbytes: ByteString = Deserialize::deserialize(deserializer)?;
+    let _decoded_txn = rlp::decode::<LegacyTransactionRlp>(&txbytes.0).map_err(D::Error::custom)?;
+    Ok(txbytes)
 }
 
 #[derive(Deserialize, Debug)]
@@ -205,11 +218,9 @@ pub(crate) struct TransactionGeneralState {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TransactionBlockchainTest {
-    #[serde(default)]
-    pub(crate) access_lists: Vec<AccessListsInner>,
-    pub(crate) data: ByteString,
+    pub(crate) data:ByteString,
     pub(crate) gas_limit: U256,
-    pub(crate) gas_price: Option<U256>,
+    pub(crate) gas_price: U256,
     pub(crate) nonce: U256,
     #[serde(default)]
     pub(crate) secret_key: H256,
@@ -218,6 +229,25 @@ pub(crate) struct TransactionBlockchainTest {
     pub(crate) to: Option<H160>,
     // Protect against overflow.
     pub(crate) value: U512,
+    pub(crate) v: U256,
+    pub(crate) r: U256,
+    pub(crate) s: U256,
+}
+
+impl TransactionBlockchainTest {
+    // pub fn as_legacy_transaction(&self) -> LegacyTransactionRlp {
+    //     LegacyTransactionRlp {
+    //         nonce: self.nonce,
+    //         gas_price: self.gas_price,
+    //         gas: self.gas_limit,
+    //         to: self.to,
+    //         value: U256::try_from(self.value).expect("Transaction value too large"),
+    //         data: self.data.clone(),
+    //         v: self.v,
+    //         r: self.r,
+    //         s: self.s,
+    //     }
+    // }
 }
 
 #[derive(Deserialize, Debug)]
