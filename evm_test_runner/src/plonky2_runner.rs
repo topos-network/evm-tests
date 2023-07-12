@@ -338,8 +338,8 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
 
     if
         actual_state_trie_hash != test.common.expected_final_account_state_root_hash ||
-        // TODO: Is it true that only/always the first variant is consistent with blockchain tests?
-        // test.gen_inputs.signed_txns ==  &&
+        // The other tries are only checked for blockchain tests
+        test.is_blockchain  &&
         (
             actual_transactions_trie_hash != test.common.expected_final_transactions_root_hash ||
             actual_receipt_trie_hash != test.common.expected_final_receipt_root_hash
