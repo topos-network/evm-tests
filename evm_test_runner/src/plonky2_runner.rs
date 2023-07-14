@@ -313,7 +313,7 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
 
     if verify_proof(
         &AllStark::default(),
-        proof_run_output,
+        proof_run_output.clone(),
         &StarkConfig::standard_fast_config(),
     )
     .is_err()
