@@ -10,20 +10,24 @@ use std::collections::HashMap;
 use anyhow::Result;
 use common::{
     config,
-    types::{ConstGenerationInputs, Plonky2ParsedTest, TestVariant, TestVariantCommon}, revm::SerializableEVMInstance,
+    revm::SerializableEVMInstance,
+    types::{ConstGenerationInputs, Plonky2ParsedTest, TestVariant, TestVariantCommon},
 };
 use eth_trie_utils::{
     nibbles::Nibbles,
     partial_trie::{HashedPartialTrie, PartialTrie},
 };
 use ethereum_types::{Address, H256, U256};
+use hex_literal::hex;
 use keccak_hash::keccak;
-use plonky2_evm::{generation::{TrieInputs, mpt::LegacyTransactionRlp}, proof::BlockMetadata};
+use plonky2_evm::{
+    generation::{mpt::LegacyTransactionRlp, TrieInputs},
+    proof::BlockMetadata,
+};
 use rlp::Encodable;
 use rlp_derive::{RlpDecodable, RlpEncodable};
-use hex_literal::hex;
 
-use crate::deserialize::{Env, GeneralStateTestBody, BlockchainTestBody, BlockHeader};
+use crate::deserialize::{BlockHeader, BlockchainTestBody, Env, GeneralStateTestBody};
 
 #[derive(RlpDecodable, RlpEncodable)]
 pub(crate) struct AccountRlp {
@@ -44,13 +48,12 @@ impl Env {
             block_chain_id: config::ETHEREUM_CHAIN_ID.into(),
             block_base_fee: self.current_base_fee,
             block_bloom,
-            block_gas_used
+            block_gas_used,
         }
     }
 }
 
 impl GeneralStateTestBody {
-
     fn get_storage_tries(&self) -> Vec<(H256, HashedPartialTrie)> {
         self.pre
             .iter()
@@ -101,7 +104,9 @@ impl GeneralStateTestBody {
             .enumerate()
             .map(|(txn_idx, post)| {
                 (
-                    Nibbles::from_bytes_be(&txn_idx.to_be_bytes()).unwrap(), //TODO: It seems this should be rlp(txn_idx)
+                    Nibbles::from_bytes_be(&txn_idx.to_be_bytes()).unwrap(), /* TODO: It seems
+                                                                              * this should be
+                                                                              * rlp(txn_idx) */
                     post.txbytes.0.clone(),
                 )
             })
@@ -131,16 +136,20 @@ fn hash(bytes: &[u8]) -> H256 {
     H256::from(keccak(bytes).0)
 }
 
-pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBody, blockchain_test_body: &BlockchainTestBody) -> Plonky2ParsedTest {
+pub(crate) fn as_plonky2_test_input(
+    general_state_test_body: &GeneralStateTestBody,
+    blockchain_test_body: &BlockchainTestBody,
+) -> Plonky2ParsedTest {
     let storage_tries = general_state_test_body.get_storage_tries();
     let state_trie = general_state_test_body.get_state_trie(&storage_tries);
 
     let tries = TrieInputs {
         state_trie,
-        transactions_trie: HashedPartialTrie::default(), // TODO: Is it ok to start with the empty trie?
+        transactions_trie: HashedPartialTrie::default(), /* TODO: Is it ok to start with the
+                                                          * empty trie? */
         receipts_trie: HashedPartialTrie::default(), /* TODO: Fill in once we know what we
-                                                        * are
-                                                        * doing... */
+                                                      * are
+                                                      * doing... */
         storage_tries,
     };
 
@@ -155,11 +164,11 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
         .shanghai
         .iter()
         .map(|x| {
-            let txn: LegacyTransactionRlp = rlp::decode(&x.txbytes.0).expect(
-                &format!("Couldn't decode transaction {:?}", x.txbytes.0)
-            );
+            let txn: LegacyTransactionRlp = rlp::decode(&x.txbytes.0)
+                .expect(&format!("Couldn't decode transaction {:?}", x.txbytes.0));
             let string = hex::encode(&x.txbytes.0);
-            // Check if the signature of the current transaction coincides with the in the blockchain test
+            // Check if the signature of the current transaction coincides with the in the
+            // blockchain test
             let is_blockchain = blockchain_test_body.blocks[0].transactions.len() > 0 && // There are some tests with empty transactions field (e.g. eth_tests/GeneralStateTests/stEIP3607/transactionCollidingWithNonEmptyAccount_send.jso)
                 txn.r == blockchain_test_body.blocks[0].transactions[0].r &&
                 txn.s == blockchain_test_body.blocks[0].transactions[0].s &&
@@ -170,25 +179,33 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
                 common: TestVariantCommon {
                     expected_final_account_state_root_hash: x.hash,
                     // TODO: transaction trie shouldn't change with variants?
-                    expected_final_transactions_root_hash: blockchain_test_body.blocks[0].block_header.transactions_trie,
-                    expected_final_receipt_root_hash: blockchain_test_body.blocks[0].block_header.receipt_trie
+                    expected_final_transactions_root_hash: blockchain_test_body.blocks[0]
+                        .block_header
+                        .transactions_trie,
+                    expected_final_receipt_root_hash: blockchain_test_body.blocks[0]
+                        .block_header
+                        .receipt_trie,
                 },
             }
         })
         .collect();
 
-    let addresses = general_state_test_body.pre.keys().copied().collect::<Vec<Address>>();
+    let addresses = general_state_test_body
+        .pre
+        .keys()
+        .copied()
+        .collect::<Vec<Address>>();
 
     let const_plonky2_inputs = ConstGenerationInputs {
         tries,
         contract_code,
         block_metadata: general_state_test_body.env.block_metadata(
             blockchain_test_body.blocks[0].block_header.bloom,
-            blockchain_test_body.blocks[0].block_header.gas_used
+            blockchain_test_body.blocks[0].block_header.gas_used,
         ),
         addresses,
         gas_used_before: blockchain_test_body.genesis_block_header.gas_used,
-        block_bloom_before: blockchain_test_body.genesis_block_header.bloom
+        block_bloom_before: blockchain_test_body.genesis_block_header.bloom,
     };
 
     Plonky2ParsedTest {

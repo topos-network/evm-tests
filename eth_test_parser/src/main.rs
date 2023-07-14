@@ -11,7 +11,10 @@ use futures::future::join_all;
 use log::warn;
 
 use crate::fs_scaffolding::{get_default_out_dir, get_deserialized_test_bodies};
-use crate::{config::ETH_TESTS_REPO_LOCAL_PATH, eth_tests_fetching::clone_or_update_remote_tests, trie_builder::as_plonky2_test_input};
+use crate::{
+    config::ETH_TESTS_REPO_LOCAL_PATH, eth_tests_fetching::clone_or_update_remote_tests,
+    trie_builder::as_plonky2_test_input,
+};
 
 mod arg_parsing;
 mod config;

@@ -74,7 +74,10 @@ impl ParsedTestManifest {
                     addresses: self.plonky2_variants.const_plonky2_inputs.addresses.clone(),
                     txn_number_before: U256::zero(), // TODO: Is it always the case?
                     gas_used_before: self.plonky2_variants.const_plonky2_inputs.gas_used_before,
-                    block_bloom_before: self.plonky2_variants.const_plonky2_inputs.block_bloom_before,
+                    block_bloom_before: self
+                        .plonky2_variants
+                        .const_plonky2_inputs
+                        .block_bloom_before,
                 };
                 let is_blockchain = t_var.is_blockchain;
 
@@ -83,7 +86,7 @@ impl ParsedTestManifest {
                     common: t_var.common,
                     revm_variant,
                     variant_idx,
-                    is_blockchain
+                    is_blockchain,
                 }
             })
             .collect();
@@ -111,7 +114,8 @@ pub struct Plonky2ParsedTest {
 pub struct TestVariant {
     /// The txn bytes for each txn in the test.
     pub txn_bytes: Vec<u8>,
-    /// True if this variant transaction matches the one in the corresponding Blockchain test
+    /// True if this variant transaction matches the one in the corresponding
+    /// Blockchain test
     pub is_blockchain: bool,
     pub common: TestVariantCommon,
 }

@@ -1,14 +1,12 @@
 #![allow(dead_code)]
-use std::{marker::PhantomData, fmt};
 use std::collections::HashMap;
 use std::str::FromStr;
-use anyhow::{Result, bail};
+use std::{fmt, marker::PhantomData};
 
-use plonky2_evm::generation::mpt::LegacyTransactionRlp;
-
-
+use anyhow::{bail, Result};
 use ethereum_types::{Address, H160, H256, U256, U512};
 use hex::FromHex;
+use plonky2_evm::generation::mpt::LegacyTransactionRlp;
 use serde::de::MapAccess;
 use serde::{
     de::{Error, Visitor},
@@ -103,26 +101,35 @@ where
 // For deserializing bloom filters
 fn vec_u256_from_hex<'de, D>(deserializer: D) -> Result<[U256; 8], D::Error>
 where
-    D: Deserializer<'de>
+    D: Deserializer<'de>,
 {
     let str: String = Deserialize::deserialize(deserializer)?;
-    let el_valor: Result<Vec<_>, D::Error> = str[2..].chars().collect::<Vec<char>>()
+    let el_valor: Result<Vec<_>, D::Error> = str[2..]
+        .chars()
+        .collect::<Vec<char>>()
         .chunks(64)
-        .map(|str|
+        .map(|str| {
             U256::from_str_radix(&str.iter().collect::<String>()[..], 16).map_err(D::Error::custom)
-        )
+        })
         .collect();
     if let Ok(el_valor) = el_valor {
         if el_valor.len() < 8 {
-            return Err(D::Error::custom("Field bloom too short"))
-        }
-        else{
-            return Ok([el_valor[0], el_valor[1], el_valor[2], el_valor[3], el_valor[4], el_valor[5], el_valor[6], el_valor[7]])
+            return Err(D::Error::custom("Field bloom too short"));
+        } else {
+            return Ok([
+                el_valor[0],
+                el_valor[1],
+                el_valor[2],
+                el_valor[3],
+                el_valor[4],
+                el_valor[5],
+                el_valor[6],
+                el_valor[7],
+            ]);
         }
     }
     Err(D::Error::custom("Invalid bloom field"))
 }
-
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -218,7 +225,7 @@ pub(crate) struct TransactionGeneralState {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TransactionBlockchainTest {
-    pub(crate) data:ByteString,
+    pub(crate) data: ByteString,
     pub(crate) gas_limit: U256,
     pub(crate) gas_price: U256,
     pub(crate) nonce: U256,
@@ -241,8 +248,8 @@ impl TransactionBlockchainTest {
     //         gas_price: self.gas_price,
     //         gas: self.gas_limit,
     //         to: self.to,
-    //         value: U256::try_from(self.value).expect("Transaction value too large"),
-    //         data: self.data.clone(),
+    //         value: U256::try_from(self.value).expect("Transaction value too
+    // large"),         data: self.data.clone(),
     //         v: self.v,
     //         r: self.r,
     //         s: self.s,
@@ -259,8 +266,8 @@ pub(crate) struct GeneralStateTestBody {
 }
 
 /*
-    Strucs for deserializing tests in the BlockchainTest folder
- */
+   Strucs for deserializing tests in the BlockchainTest folder
+*/
 
 #[derive(Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
@@ -283,7 +290,7 @@ pub(crate) struct BlockHeader {
     pub(crate) state_root: H256,
     pub(crate) timestamp: U256,
     pub(crate) transactions_trie: H256,
-    pub(crate) uncle_hash: H256
+    pub(crate) uncle_hash: H256,
 }
 
 #[derive(Deserialize, Debug)]
@@ -308,24 +315,26 @@ pub(crate) struct BlockchainTestBody {
     pub(crate) pre: HashMap<H160, PreAccount>,
 }
 
-// TODO: I wanted to make this a trie, but I run into problems becasue at some point I need to implement impl<T> From<T> for
-// Plonky2ParsedTest, where T: TestBody, and the compiler complains that:
-// error: type parameter `T` must be used as the type parameter for some local type (e.g. `MyStruct<T>`);
-// only traits defined in the current crate can be implemented for a type parameter  
+// TODO: I wanted to make this a trie, but I run into problems becasue at some
+// point I need to implement impl<T> From<T> for Plonky2ParsedTest, where T:
+// TestBody, and the compiler complains that: error: type parameter `T` must be
+// used as the type parameter for some local type (e.g. `MyStruct<T>`);
+// only traits defined in the current crate can be implemented for a type
+// parameter
 #[derive(Debug)]
 pub(crate) enum TestBody {
     BlockchainTestBody(BlockchainTestBody),
-    GeneralStateTestBody(GeneralStateTestBody)
+    GeneralStateTestBody(GeneralStateTestBody),
 }
 
 struct TestBodyVisitor {
-    marker: PhantomData<fn() -> TestBody>
+    marker: PhantomData<fn() -> TestBody>,
 }
 
 impl TestBodyVisitor {
     fn new() -> Self {
         TestBodyVisitor {
-            marker: PhantomData
+            marker: PhantomData,
         }
     }
 }
@@ -340,15 +349,15 @@ impl<'de> Visitor<'de> for TestBodyVisitor {
 
     fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
     where
-        M: MapAccess<'de>
+        M: MapAccess<'de>,
     {
         while let Some((key, body)) = access.next_entry::<String, _>()? {
             if key.ends_with("_Shanghai") {
-                let body: BlockchainTestBody = serde_json::from_value(body).expect("Invalid Blockchain test");
-                return Ok(TestBody::BlockchainTestBody(body))
-            }
-            else if let Ok(body) = serde_json::from_value::<GeneralStateTestBody>(body) {
-                return Ok(TestBody::GeneralStateTestBody(body))
+                let body: BlockchainTestBody =
+                    serde_json::from_value(body).expect("Invalid Blockchain test");
+                return Ok(TestBody::BlockchainTestBody(body));
+            } else if let Ok(body) = serde_json::from_value::<GeneralStateTestBody>(body) {
+                return Ok(TestBody::GeneralStateTestBody(body));
             }
         }
         Err(serde::de::Error::custom("Invalid JSON"))
@@ -368,9 +377,10 @@ impl<'de> Deserialize<'de> for TestBody {
 mod tests {
     use std::{fs::File, io::BufReader};
 
-    use ethereum_types::{U256, H256};
+    use ethereum_types::{H256, U256};
     use hex_literal::hex;
-    use super::{ByteString, TestBody, Block};
+
+    use super::{Block, ByteString, TestBody};
 
     const TEST_HEX_STR: &str = "\"0xf863800a83061a8094095e7baea6a6c7c4c2dfeb977efac326af552d87830186a0801ba0ffb600e63115a7362e7811894a91d8ba4330e526f22121c994c4692035dfdfd5a06198379fcac8de3dbfac48b165df4bf88e2088f294b61efb9a65fe2281c76e16\"";
 
@@ -654,7 +664,8 @@ mod tests {
     }]
     ";
 
-    const FILE_PATH: &str = "../eth_tests/BlockchainTests/GeneralStateTests/stArgsZeroOneBalance/addmodNonConst.json";
+    const FILE_PATH: &str =
+        "../eth_tests/BlockchainTests/GeneralStateTests/stArgsZeroOneBalance/addmodNonConst.json";
 
     #[test]
     fn deserialize_hex_str_works() {
@@ -670,21 +681,27 @@ mod tests {
     #[test]
     fn deserialize_blockchain_test() {
         let _block: Vec<Block> = serde_json::from_str(BLOCK_JSON).unwrap();
-        if let TestBody::BlockchainTestBody(body) = serde_json::from_str(BLOCKCHAIN_TEST_JSON).unwrap() {
+        if let TestBody::BlockchainTestBody(body) =
+            serde_json::from_str(BLOCKCHAIN_TEST_JSON).unwrap()
+        {
             assert_eq!(body.blocks[0].block_header.gas_limit, U256::from(0x0f4240));
             assert_eq!(body.genesis_block_header.gas_limit, U256::from(0x0f4240));
-            return
+            return;
         }
-        panic!()        
+        panic!()
     }
 
     #[test]
     fn deserialize_general_state_test() {
         let body: TestBody = serde_json::from_str(GENERALSTATE_TEST_JSON).unwrap();
         if let TestBody::GeneralStateTestBody(body) = body {
-            assert_eq!(body.post.shanghai[0].hash, H256::from(hex!("82839135ead533b540a4894ed296a14f5ff764e53a10d6ab15e12941d8adeb91")));
-        }
-        else {
+            assert_eq!(
+                body.post.shanghai[0].hash,
+                H256::from(hex!(
+                    "82839135ead533b540a4894ed296a14f5ff764e53a10d6ab15e12941d8adeb91"
+                ))
+            );
+        } else {
             panic!()
         }
     }
@@ -692,11 +709,12 @@ mod tests {
     // #[test]
     // fn deserialize_blockchain_test_from_file() {
     //     let buf = BufReader::new(File::open(FILE_PATH));
-    //     if let TestBody::BlockchainTestBody(body) = serde_json::from_reader(buf)? {
-    //         assert_eq!(body.blocks[0].block_header.gas_limit, U256::from(0x0f4240));
-    //         assert_eq!(body.genesis_block_header.gas_limit, U256::from(0x0f4240));
+    //     if let TestBody::BlockchainTestBody(body) =
+    // serde_json::from_reader(buf)? {         assert_eq!(body.blocks[0].
+    // block_header.gas_limit, U256::from(0x0f4240));         assert_eq!
+    // (body.genesis_block_header.gas_limit, U256::from(0x0f4240));
     //         return
     //     }
-    //     panic!()  
+    //     panic!()
     // }
 }
