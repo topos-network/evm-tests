@@ -13,7 +13,7 @@ use plonky2_evm::proof::BlockMetadataTarget;
 
 use crate::deserialize::TestBody;
 use crate::{
-    config::{BLOCKCHAIN_TEST_DIR, ETH_TESTS_REPO_LOCAL_PATH, TEST_GROUPS},
+    config::{BLOCKCHAIN_TEST_DIR, ETH_TESTS_REPO_LOCAL_PATH, GENERAL_TEST_GROUPS},
     deserialize::{BlockchainTestBody, GeneralStateTestBody},
 };
 
@@ -95,7 +95,7 @@ pub(crate) fn get_test_group_sub_dirs<const N: usize>(
 /// // │   └── {test_case_n}.json
 /// ```
 pub(crate) fn get_test_files() -> Result<impl Iterator<Item = (DirEntry, DirEntry)>> {
-    let dirs_general_state_tests = get_test_group_sub_dirs(&"", &TEST_GROUPS)?
+    let dirs_general_state_tests = get_test_group_sub_dirs(&"", &GENERAL_TEST_GROUPS)?
         .flat_map(|entry| fs::read_dir(entry.path()))
         .flatten()
         .flatten()
@@ -107,7 +107,7 @@ pub(crate) fn get_test_files() -> Result<impl Iterator<Item = (DirEntry, DirEntr
     // Alonso del futuro: Este zip debe ser mejor hacerlo cuando se llama a
     // get_test_files agregando el argumento path a get_test_files
     let dirs_blockchain_tests: Vec<DirEntry> =
-        get_test_group_sub_dirs(&BLOCKCHAIN_TEST_DIR, &TEST_GROUPS)?
+        get_test_group_sub_dirs(&BLOCKCHAIN_TEST_DIR, &GENERAL_TEST_GROUPS)?
             .flat_map(|entry| fs::read_dir(entry.path()))
             .flatten()
             .flatten()
@@ -122,7 +122,7 @@ pub(crate) fn get_test_files() -> Result<impl Iterator<Item = (DirEntry, DirEntr
 /// Create output directories mirroring the structure of source test
 /// directories.
 pub(crate) fn prepare_output_dir(out_path: &Path) -> Result<()> {
-    for dir in get_test_group_sub_dirs("", &TEST_GROUPS)? {
+    for dir in get_test_group_sub_dirs("", &GENERAL_TEST_GROUPS)? {
         fs::create_dir_all(out_path.join(dir.path().strip_prefix(ETH_TESTS_REPO_LOCAL_PATH)?))?
     }
     // Do the same for blockchain tests?
@@ -190,5 +190,5 @@ fn get_deserialized_blockchain_test_body(entry: &DirEntry) -> Result<BlockchainT
             return anyhow::Ok(v);
         }
     }
-    bail!("Could'n deserialize blochckain test")
+    bail!("Couldn't deserialize blochckain test")
 }
