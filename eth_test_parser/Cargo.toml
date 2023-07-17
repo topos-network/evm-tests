@@ -11,6 +11,7 @@ edition = "2021"
 common = { path = "../common" }
 eth_trie_utils = "0.6.0"
 plonky2_evm = { path = "../../topos-plonky2/evm" }
+bytes = "1.4.0"
 
 anyhow = { version = "1.0.71", features = ["backtrace"] }
 clap = {version = "4.2.7", features = ["derive"] }
