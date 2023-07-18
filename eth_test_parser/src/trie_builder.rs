@@ -18,7 +18,7 @@ use eth_trie_utils::{
 };
 use ethereum_types::{Address, H256, U256};
 use keccak_hash::keccak;
-use plonky2_evm::{generation::{TrieInputs, mpt::LegacyTransactionRlp}, proof::BlockMetadata};
+use plonky2_evm::{generation::{TrieInputs, mpt::{LegacyTransactionRlp, Type1TransactionRlp, Type2TransactionRlp}}, proof::BlockMetadata};
 use rlp::Encodable;
 use rlp_derive::{RlpDecodable, RlpEncodable};
 use hex_literal::hex;
@@ -155,15 +155,15 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
         .shanghai
         .iter()
         .map(|x| {
-            let txn: LegacyTransactionRlp = rlp::decode(&x.txbytes.0).expect(
-                &format!("Couldn't decode transaction {:?}", x.txbytes.0)
-            );
-            let string = hex::encode(&x.txbytes.0);
-            // Check if the signature of the current transaction coincides with the in the blockchain test
-            let is_blockchain = blockchain_test_body.blocks[0].transactions.len() > 0 && // There are some tests with empty transactions field (e.g. eth_tests/GeneralStateTests/stEIP3607/transactionCollidingWithNonEmptyAccount_send.jso)
-                txn.r == blockchain_test_body.blocks[0].transactions[0].r &&
-                txn.s == blockchain_test_body.blocks[0].transactions[0].s &&
-                txn.v == blockchain_test_body.blocks[0].transactions[0].v;
+            // Check if the signature of the current transaction coincides with the one in the blockchain test
+
+            let is_blockchain = 
+                blockchain_test_body.blocks[0].transactions.len() > 0 && // There are some tests with empty transactions field (e.g. eth_tests/GeneralStateTests/stEIP3607/transactionCollidingWithNonEmptyAccount_send.jso)
+                get_transaction_signature(&x.txbytes.0[..]) == (
+                    blockchain_test_body.blocks[0].transactions[0].r,
+                    blockchain_test_body.blocks[0].transactions[0].s,
+                    blockchain_test_body.blocks[0].transactions[0].v
+                );
             TestVariant {
                 txn_bytes: x.txbytes.0.clone(),
                 is_blockchain,
@@ -196,3 +196,28 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
         const_plonky2_inputs,
     }
 }
+
+/// Decodes the bytes of the transaction an returns the transaction signature
+fn get_transaction_signature(txbytes: &[u8]) -> (U256, U256, U256) {
+    // A type 1 txn starts with 0x01
+    if txbytes[0] == 1u8 {
+        let txn: Type1TransactionRlp = rlp::decode(&txbytes[1..]).expect("Invalid type 1 or 2 txn");
+        return (txn.y_parity, txn.r, txn.s);
+    }
+    // A type 2 txn starts with 0x02
+    else if  txbytes[0] == 2u8 {
+        let txn: Type2TransactionRlp = rlp::decode(&txbytes[1..]).expect("Invalid type 1 or 2 txn");
+        return (txn.y_parity, txn.r, txn.s)
+    }
+    else {
+        let txn: LegacyTransactionRlp = rlp::decode(&txbytes)
+            .expect(&format!("Couldn't decode transaction {:?}", txbytes));
+        return (txn.v, txn.r, txn.s)
+    }
+}
+
+#[test]
+fn test_signature() {
+    let txbytes = hex!("f880806482520894d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0a1010000000000000000000000000000000000000000000000000000000000000001801ba0c16787a8e25e941d67691954642876c08f00996163ae7dfadbbfd6cd436f549da06180e5626cae31590f40641fe8f63734316c4bfeb4cdfab6714198c1044d2e28");
+    print!("signature = {:?}", get_transaction_signature(&txbytes))
+} 

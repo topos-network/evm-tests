@@ -47,10 +47,8 @@ async fn run(ProgArgs { no_fetch, out_path }: ProgArgs) -> anyhow::Result<()> {
         match res {
             Ok((
                 (state_test_dir_entry, state_test_body),
-                (blockchain_test_dir_entry, blockchain_test_body)
+                (_, blockchain_test_body)
             )) => Some(tokio::task::spawn_blocking(move || {
-                println!("state_dir_entry {:?}", state_test_dir_entry);
-                println!("blockchain dir entry {:?}", blockchain_test_dir_entry);
                 let parsed_test = as_plonky2_test_input(&state_test_body, &blockchain_test_body);
                 let revm_variants = match state_test_body.as_serializable_evm_instances() {
                     Ok(revm_variants) => Some(revm_variants),
@@ -63,7 +61,6 @@ async fn run(ProgArgs { no_fetch, out_path }: ProgArgs) -> anyhow::Result<()> {
                         None
                     }
                 };
-
                 let test_manifest = ParsedTestManifest {
                     plonky2_variants: parsed_test,
                     revm_variants,
@@ -89,7 +86,6 @@ async fn run(ProgArgs { no_fetch, out_path }: ProgArgs) -> anyhow::Result<()> {
     );
 
     for thread in join_all(generation_input_handles).await {
-        println!("JEmele");
         let (test_dir_entry, generation_inputs) = thread.unwrap();
         let mut path = out_path.join(
             test_dir_entry

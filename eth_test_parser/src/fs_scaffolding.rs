@@ -84,6 +84,11 @@ pub(crate) fn get_test_group_sub_dirs<const N: usize>(sub_dir: &str, test_group:
 /// // ├── {TestNameN}
 /// // │   ├── {test_case_1}.json  <--- HERE
 /// // │   └── {test_case_n}.json
+/// // and
+/// // ../BlockchainTests/GeneralStateTests/{TestGroupN}
+/// // ├── {TestNameN}
+/// // │   ├── {test_case_1}.json  <--- HERE
+/// // │   └── {test_case_n}.json
 /// ```
 pub(crate) fn get_test_files() -> Result<impl Iterator<Item = (DirEntry, DirEntry)>> {
     let dirs_general_state_tests = get_test_group_sub_dirs(&"", &TEST_GROUPS)?
@@ -96,14 +101,15 @@ pub(crate) fn get_test_files() -> Result<impl Iterator<Item = (DirEntry, DirEntr
         });
 
     // Alonso del futuro: Este zip debe ser mejor hacerlo cuando se llama a get_test_files agregando el argumento path a get_test_files
-    let dirs_blockchain_tests: Vec<DirEntry> = get_test_group_sub_dirs(&BLOCKCHAIN_TEST_DIR, &TEST_GROUPS)?
+    let dirs_blockchain_tests = get_test_group_sub_dirs(&BLOCKCHAIN_TEST_DIR, &TEST_GROUPS)?
     .flat_map(|entry| fs::read_dir(entry.path()))
     .flatten()
     .flatten()
     .filter(|entry| match entry.path().extension() {
         None => false,
         Some(ext) => ext == "json",
-    }).collect();
+    });
+
     Ok(dirs_general_state_tests.zip(dirs_blockchain_tests))
 }
 
