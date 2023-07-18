@@ -9,11 +9,8 @@ use std::{
 
 use anyhow::{anyhow, Result, bail};
 use common::config::GENERATION_INPUTS_DEFAULT_OUTPUT_DIR;
-use plonky2_evm::proof::BlockMetadataTarget;
 
 use crate::{config::{ETH_TESTS_REPO_LOCAL_PATH, TEST_GROUPS, BLOCKCHAIN_TEST_DIR}, deserialize::{GeneralStateTestBody, BlockchainTestBody}};
-use crate::deserialize::TestBody;
-
 /// Get the default parsed test output directory.
 /// We first check if the flat file, `ETH_TEST_PARSER_DEV`, exists
 /// in the current working directory. If so, we assume we're in a development
@@ -100,7 +97,6 @@ pub(crate) fn get_test_files() -> Result<impl Iterator<Item = (DirEntry, DirEntr
             Some(ext) => ext == "json",
         });
 
-    // Alonso del futuro: Este zip debe ser mejor hacerlo cuando se llama a get_test_files agregando el argumento path a get_test_files
     let dirs_blockchain_tests = get_test_group_sub_dirs(&BLOCKCHAIN_TEST_DIR, &TEST_GROUPS)?
     .flat_map(|entry| fs::read_dir(entry.path()))
     .flatten()

@@ -2,11 +2,7 @@
 use std::{marker::PhantomData, fmt};
 use std::collections::HashMap;
 use std::str::FromStr;
-use anyhow::{Result, bail};
-
-use plonky2_evm::generation::mpt::LegacyTransactionRlp;
-
-
+use anyhow::{Result};
 use ethereum_types::{Address, H160, H256, U256, U512};
 use hex::FromHex;
 use serde::de::MapAccess;
@@ -122,7 +118,6 @@ where
     }
     Err(D::Error::custom("Invalid bloom field"))
 }
-
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -273,7 +268,7 @@ pub(crate) struct BlockHeader {
     // pub(crate) coinbase: H160,
     // pub(crate) difficulty: U256,
     // pub(crate) extra_data: ByteString,
-    // pub(crate) gas_limit: U256,
+    pub(crate) gas_limit: U256,
     pub(crate) gas_used: U256,
     // pub(crate) hash: H256,
     // pub(crate) mix_hash: H256,
@@ -668,16 +663,16 @@ mod tests {
         assert_eq!(byte_str.0[byte_str.0.len() - 2], 0x6e);
     }
 
-    // #[test]
-    // fn deserialize_blockchain_test() {
-    //     let _block: Vec<Block> = serde_json::from_str(BLOCK_JSON).unwrap();
-    //     if let TestBody::BlockchainTestBody(body) = serde_json::from_str(BLOCKCHAIN_TEST_JSON).unwrap() {
-    //         assert_eq!(body.blocks[0].block_header.gas_limit, U256::from(0x0f4240));
-    //         assert_eq!(body.genesis_block_header.gas_limit, U256::from(0x0f4240));
-    //         return
-    //     }
-    //     panic!()        
-    // }
+    #[test]
+    fn deserialize_blockchain_test() {
+        let _block: Vec<Block> = serde_json::from_str(BLOCK_JSON).unwrap();
+        if let TestBody::BlockchainTestBody(body) = serde_json::from_str(BLOCKCHAIN_TEST_JSON).unwrap() {
+            assert_eq!(body.blocks[0].block_header.gas_limit, U256::from(0x0f4240));
+            assert_eq!(body.genesis_block_header.gas_limit, U256::from(0x0f4240));
+            return
+        }
+        panic!()        
+    }
 
     #[test]
     fn deserialize_general_state_test() {

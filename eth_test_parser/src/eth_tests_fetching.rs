@@ -3,7 +3,9 @@
 use std::{path::Path, process::Command};
 
 use crate::{
-    config::{ETH_TESTS_REPO_LOCAL_PATH, ETH_TESTS_REPO_URL, TEST_GROUPS},
+    config::{
+        BLOCKCHAIN_TEST_DIR, ETH_TESTS_REPO_LOCAL_PATH, ETH_TESTS_REPO_URL, TEST_GROUPS,
+    },
     utils::run_cmd,
 };
 
@@ -47,7 +49,9 @@ fn download_remote_tests() {
 
     println!(
         "Setting sparse checkout for test groups... ({})",
-        TEST_GROUPS.join(", ")
+        [TEST_GROUPS, [BLOCKCHAIN_TEST_DIR]]
+            .concat()
+            .join(", ")
     );
     // sparse-checkout out the relevant test group folders.
     // TODO: Do the same for BLOCKCHAIN_TEST_GROUPS?

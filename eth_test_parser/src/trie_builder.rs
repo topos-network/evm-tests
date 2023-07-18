@@ -17,11 +17,11 @@ use eth_trie_utils::{
     partial_trie::{HashedPartialTrie, PartialTrie},
 };
 use ethereum_types::{Address, H256, U256};
+use hex_literal::hex;
 use keccak_hash::keccak;
 use plonky2_evm::{generation::{TrieInputs, mpt::{LegacyTransactionRlp, Type1TransactionRlp, Type2TransactionRlp}}, proof::BlockMetadata};
 use rlp::Encodable;
 use rlp_derive::{RlpDecodable, RlpEncodable};
-use hex_literal::hex;
 
 use crate::deserialize::{Env, GeneralStateTestBody, BlockchainTestBody, BlockHeader};
 
@@ -50,7 +50,6 @@ impl Env {
 }
 
 impl GeneralStateTestBody {
-
     fn get_storage_tries(&self) -> Vec<(H256, HashedPartialTrie)> {
         self.pre
             .iter()

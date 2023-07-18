@@ -7,6 +7,7 @@ use std::{
 };
 
 use common::types::TestVariantRunInfo;
+use eth_trie_utils::partial_trie::{HashedPartialTrie, PartialTrie};
 use ethereum_types::H256;
 use eth_trie_utils::partial_trie::{HashedPartialTrie, PartialTrie};
 use futures::executor::block_on;
@@ -16,7 +17,9 @@ use plonky2::{
     field::goldilocks_field::GoldilocksField, plonk::config::KeccakGoldilocksConfig,
     util::timing::TimingTree,
 };
-use plonky2_evm::{all_stark::AllStark, config::StarkConfig, prover::prove_with_outputs};
+use plonky2_evm::{
+    all_stark::AllStark, config::StarkConfig, prover::prove_with_outputs, verifier::verify_proof,
+};
 use tokio::{select, time::timeout};
 
 use crate::{
@@ -309,7 +312,18 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
         Err(evm_err) => return TestStatus::EvmErr(evm_err.to_string()),
     };
 
+    if verify_proof(
+        &AllStark::default(),
+        proof_run_output.clone(),
+        &StarkConfig::standard_fast_config(),
+    )
+    .is_err()
+    {
+        return TestStatus::EvmErr("Proof verification failed.".to_string());
+    }
+
     let actual_state_trie_hash = proof_run_output.public_values.trie_roots_after.state_root;
+<<<<<<< HEAD
     let actual_transactions_trie_hash = proof_run_output.public_values.trie_roots_after.transactions_root;
     let actual_receipt_trie_hash = proof_run_output.public_values.trie_roots_after.receipts_root;
     println!("the expected txn hash = {:?}", test.common.expected_final_transactions_root_hash);
@@ -318,13 +332,42 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
     println!("the receipt hash = {:?}", actual_receipt_trie_hash);
     println!("state trie hash = {:?}", actual_state_trie_hash);
     println!("expected state trie hash = {:?}", test.common.expected_final_account_state_root_hash);
+=======
+    let actual_transactions_trie_hash = proof_run_output
+        .public_values
+        .trie_roots_after
+        .transactions_root;
+    let actual_receipt_trie_hash = proof_run_output
+        .public_values
+        .trie_roots_after
+        .receipts_root;
+    println!(
+        "the expected txn hash = {:?}",
+        test.common.expected_final_transactions_root_hash
+    );
+    println!("the txn hash = {:?}", actual_transactions_trie_hash);
+    println!(
+        "the expected receipt hash = {:?}",
+        test.common.expected_final_receipt_root_hash
+    );
+    println!("the receipt hash = {:?}", actual_receipt_trie_hash);
+    println!("state trie hash = {:?}", actual_state_trie_hash);
+    println!(
+        "expected state trie hash = {:?}",
+        test.common.expected_final_account_state_root_hash
+    );
+>>>>>>> 80891cdbe58e92995e25591fc236c6a619cd5522
     // let mut expected_transactions_trie: HashedPartialTrie = Node::Leaf {
     //     nibbles: Nibbles::from_str("0x80").unwrap(),
     //     value: test.txn_bytes.0.clone().into_vec()
     // }
 
+<<<<<<< HEAD
     if
         actual_state_trie_hash != test.common.expected_final_account_state_root_hash ||
+=======
+    if actual_state_trie_hash != test.common.expected_final_account_state_root_hash ||
+>>>>>>> 80891cdbe58e92995e25591fc236c6a619cd5522
         // The other tries are only checked for blockchain tests
         test.is_blockchain  &&
         (
@@ -349,11 +392,19 @@ fn run_test_and_get_test_result(test: TestVariantRunInfo) -> TestStatus {
             ),
             receipt: TrieComparisonResult::Difference(
                 actual_receipt_trie_hash,
+<<<<<<< HEAD
                 test.common.expected_final_receipt_root_hash
             ),
             transaction: TrieComparisonResult::Difference(
                 actual_transactions_trie_hash,
                 test.common.expected_final_transactions_root_hash
+=======
+                test.common.expected_final_receipt_root_hash,
+            ),
+            transaction: TrieComparisonResult::Difference(
+                actual_transactions_trie_hash,
+                test.common.expected_final_transactions_root_hash,
+>>>>>>> 80891cdbe58e92995e25591fc236c6a619cd5522
             ),
         };
 
