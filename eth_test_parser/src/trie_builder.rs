@@ -181,7 +181,6 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
         .fold(false, |acc, x| acc||x.is_blockchain);
     // the blockchain tests wihtout variant but with non empty blocks an txns
     if !is_blockchain {
-        println!("Biba cobreloa!");
         if blockchain_test_body.blocks.len() > 0 && blockchain_test_body.blocks[0].transactions.len() > 0 {
             println!("Firma 1: {:?}", (
                 blockchain_test_body.blocks[0].transactions[0].v,
