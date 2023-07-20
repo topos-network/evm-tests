@@ -21,5 +21,5 @@ macro_rules! unwrap_or_return {
 }
 
 pub fn init_env_logger() {
-    let _ = try_init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "info"));
+    let _ = try_init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "debug"));
 }

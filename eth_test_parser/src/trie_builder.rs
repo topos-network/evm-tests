@@ -5,7 +5,7 @@
 //! ```ignore
 //! crate::deserialize::TestBody -> plonky2_evm::generation::GenerationInputs
 //! ```
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use common::{
@@ -149,7 +149,7 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
         .map(|pre| (hash(&pre.code.0), pre.code.0.clone()))
         .collect();
 
-    let test_variants = general_state_test_body
+    let test_variants: Vec<_> = general_state_test_body
         .post
         .shanghai
         .iter()
@@ -157,11 +157,12 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
             // Check if the signature of the current transaction coincides with the one in the blockchain test
 
             let is_blockchain = 
+                blockchain_test_body.blocks.len() > 0 &&
                 blockchain_test_body.blocks[0].transactions.len() > 0 && // There are some tests with empty transactions field (e.g. eth_tests/GeneralStateTests/stEIP3607/transactionCollidingWithNonEmptyAccount_send.jso)
                 get_transaction_signature(&x.txbytes.0[..]) == (
+                    blockchain_test_body.blocks[0].transactions[0].v,
                     blockchain_test_body.blocks[0].transactions[0].r,
                     blockchain_test_body.blocks[0].transactions[0].s,
-                    blockchain_test_body.blocks[0].transactions[0].v
                 );
             TestVariant {
                 txn_bytes: x.txbytes.0.clone(),
@@ -175,6 +176,39 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
             }
         })
         .collect();
+    let is_blockchain = test_variants
+        .iter()
+        .fold(false, |acc, x| acc||x.is_blockchain);
+    // the blockchain tests wihtout variant but with non empty blocks an txns
+    if !is_blockchain {
+        println!("Biba cobreloa!");
+        if blockchain_test_body.blocks.len() > 0 && blockchain_test_body.blocks[0].transactions.len() > 0 {
+            println!("Firma 1: {:?}", (
+                blockchain_test_body.blocks[0].transactions[0].v,
+                blockchain_test_body.blocks[0].transactions[0].r,
+                blockchain_test_body.blocks[0].transactions[0].s,
+            ));
+            println!("Las otras: {:?}", general_state_test_body
+                .post
+                .shanghai
+                .iter()
+                .map(|x| get_transaction_signature(&x.txbytes.0[..]))
+                .collect::<Vec<_>>()
+            );
+        }
+    }
+
+    let (_ctr, sera_una_de_esas_blockchains) = test_variants
+        .iter()
+        .fold((0, false), |(ctr, acc), x| (ctr+1, acc || x.is_blockchain));
+    if !sera_una_de_esas_blockchains && blockchain_test_body.blocks.len() > 0 && blockchain_test_body.blocks[0].transactions.len() > 0 {
+            println!("una de las firmas {:?}", test_variants[0].txn_bytes);
+            println!("la de la bc = {:?}", (
+                blockchain_test_body.blocks[0].transactions[0].v,
+                blockchain_test_body.blocks[0].transactions[0].r,
+                blockchain_test_body.blocks[0].transactions[0].s
+            ));
+    }
 
     let addresses = general_state_test_body.pre.keys().copied().collect::<Vec<Address>>();
 

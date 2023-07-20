@@ -38,6 +38,14 @@ pub(crate) struct ParsedTestSubGroup {
     pub(crate) tests: Vec<Test>,
 }
 
+impl ParsedTestSubGroup {
+    pub(crate) fn has_blockchain_test(&self) -> bool {
+        self.tests.iter().fold(false, |acc, x| {
+            acc || x.info.is_blockchain
+        })
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Test {
     pub(crate) name: String,
@@ -185,6 +193,21 @@ async fn parse_test(
         1 if v_out.tot_variants_without_filter == 1 => Box::new(|_| root_test_name.clone()),
         _ => Box::new(|i| format!("{}_{}", root_test_name, i)),
     };
+    if !v_out.variants
+        .iter()
+        .fold(false, |acc, x| acc || x.is_blockchain)
+    {
+        println!(
+            "{:?} has no blockchain test {:?}",
+            path,
+            v_out.variants.iter().map(|x| x.is_blockchain).collect::<Vec<_>>()
+        );
+        // println!(
+        //     "{:?} not found in {:?}",
+        //     root_test_name,
+        //     v_out.variants.iter().map(|x| x.is_blockchain).collect::<Vec<_>>()
+        // );
+    }
 
     let blacklist_ref = blacklist.as_deref();
     Ok(v_out
