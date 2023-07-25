@@ -125,7 +125,7 @@ pub(crate) struct Env {
     pub(crate) current_base_fee: U256,
     pub(crate) current_coinbase: H160,
     pub(crate) current_difficulty: U256,
-    pub(crate) current_gas_limiting: U256,
+    pub(crate) current_gas_limit: U256,
     pub(crate) current_number: U256,
     pub(crate) current_random: U256,
     pub(crate) current_timestamp: U256,
