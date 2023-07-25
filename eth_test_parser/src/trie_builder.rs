@@ -5,25 +5,24 @@
 //! ```ignore
 //! crate::deserialize::TestBody -> plonky2_evm::generation::GenerationInputs
 //! ```
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use anyhow::Result;
 use common::{
     config,
-    types::{ConstGenerationInputs, Plonky2ParsedTest, TestVariant, TestVariantCommon}, revm::SerializableEVMInstance,
+    types::{ConstGenerationInputs, Plonky2ParsedTest, TestVariant, TestVariantCommon},
 };
 use eth_trie_utils::{
     nibbles::Nibbles,
     partial_trie::{HashedPartialTrie, PartialTrie},
 };
 use ethereum_types::{Address, H256, U256};
-use hex_literal::hex;
 use keccak_hash::keccak;
 use plonky2_evm::{generation::{TrieInputs, mpt::{LegacyTransactionRlp, Type1TransactionRlp, Type2TransactionRlp}}, proof::BlockMetadata};
 use rlp::Encodable;
 use rlp_derive::{RlpDecodable, RlpEncodable};
 
-use crate::deserialize::{Env, GeneralStateTestBody, BlockchainTestBody, BlockHeader};
+use crate::deserialize::{Env, GeneralStateTestBody, BlockchainTestBody};
 
 #[derive(RlpDecodable, RlpEncodable)]
 pub(crate) struct AccountRlp {
@@ -155,15 +154,16 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
         .iter()
         .map(|x| {
             // Check if the signature of the current transaction coincides with the one in the blockchain test
-
-            let is_blockchain = 
-                blockchain_test_body.blocks.len() > 0 &&
-                blockchain_test_body.blocks[0].transactions.len() > 0 && // There are some tests with empty transactions field (e.g. eth_tests/GeneralStateTests/stEIP3607/transactionCollidingWithNonEmptyAccount_send.jso)
+            let is_blockchain = if blockchain_test_body.blocks[0].transactions.len() > 0 {
                 get_transaction_signature(&x.txbytes.0[..]) == (
                     blockchain_test_body.blocks[0].transactions[0].v,
                     blockchain_test_body.blocks[0].transactions[0].r,
                     blockchain_test_body.blocks[0].transactions[0].s,
-                );
+                )
+            }
+            else { // We enter this branch if the test is supposed to fail
+                blockchain_test_body.blocks[0].transaction_sequence[0].raw_bytes.0 == x.txbytes.0
+            };
             TestVariant {
                 txn_bytes: x.txbytes.0.clone(),
                 is_blockchain,
@@ -181,20 +181,11 @@ pub(crate) fn as_plonky2_test_input(general_state_test_body: &GeneralStateTestBo
         .fold(false, |acc, x| acc||x.is_blockchain);
     // the blockchain tests wihtout variant but with non empty blocks an txns
     if !is_blockchain {
-        if blockchain_test_body.blocks.len() > 0 && blockchain_test_body.blocks[0].transactions.len() > 0 {
-            println!("Firma 1: {:?}", (
-                blockchain_test_body.blocks[0].transactions[0].v,
-                blockchain_test_body.blocks[0].transactions[0].r,
-                blockchain_test_body.blocks[0].transactions[0].s,
-            ));
-            println!("Las otras: {:?}", general_state_test_body
-                .post
-                .shanghai
-                .iter()
-                .map(|x| get_transaction_signature(&x.txbytes.0[..]))
-                .collect::<Vec<_>>()
-            );
-        }
+        println!(
+            "Los tries {:?} and {:?}",
+            blockchain_test_body.blocks[0].block_header.transactions_trie,
+            blockchain_test_body.blocks[0].block_header.transactions_trie,
+        )
     }
 
     let (_ctr, sera_una_de_esas_blockchains) = test_variants
@@ -248,8 +239,54 @@ fn get_transaction_signature(txbytes: &[u8]) -> (U256, U256, U256) {
     }
 }
 
+use bytes::Bytes;
+use hex_literal::hex;
 #[test]
 fn test_signature() {
     let txbytes = hex!("f880806482520894d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0a1010000000000000000000000000000000000000000000000000000000000000001801ba0c16787a8e25e941d67691954642876c08f00996163ae7dfadbbfd6cd436f549da06180e5626cae31590f40641fe8f63734316c4bfeb4cdfab6714198c1044d2e28");
     print!("signature = {:?}", get_transaction_signature(&txbytes))
 } 
+
+#[test]
+fn de_rlp_smthng() {
+    use rlp::Rlp;
+    let enc_rlp = hex!("f90261f901f9a0772baf505023559d6b8a3b6e29fceb1dad4c1776091a54c797e23bdaf27f1313a01dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347942adc25665018aa1fe0e6bc666dac8fc2697ff9baa000c7c25199d1252abf9df34035b5e2bb5577d255e0b108f175a0581573e537baa0a02cfaaef253dee0e8c7e6cfcc1960f4566d266cf1081772f1446d2109838efba095904f4e949bbc1f767e77a7f53dd981613a4c2d23ee353ae26fcd58f1ac87aeb901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000083020000018401c9c3808303fa5d8203e800a00000000000000000000000000000000000000000000000000000000000000000880000000000000000f862f860800a832dc6c094100000000000000000000000000000000000000080801ba07763c200d265ba0050627c8c7b4c19bf118b3581a3de22dbcebdfcb6e8565790a0514908f638ddc4b1402230e34692f43bb92713ff2cad3627814cf6fb19ac2e43c0");
+    let dec_rlp = Rlp::new(&enc_rlp);
+    //println!("purported state root = {:?}", dec_rlp.at(3).unwrap().as_val::<H256>());
+    // print_rlp(dec_rlp, "");
+    println!("list size = {}", dec_rlp.item_count().unwrap());
+    println!("bloom = {:?}", dec_rlp.at(0).unwrap().at(6).unwrap().as_val::<String>());
+    println!("gas limit = {:?}", dec_rlp.at(0).unwrap().at(9).unwrap().as_val::<U256>());
+    println!("gas used = {:?}", dec_rlp.at(0).unwrap().at(10).unwrap().as_val::<U256>());
+    println!("stat hash = {:?}", dec_rlp.at(0).unwrap().at(3).unwrap().as_val::<H256>());
+    println!("txn hash = {:?}", dec_rlp.at(0).unwrap().at(4).unwrap().as_val::<H256>());
+    println!("receipt hash = {:?}", dec_rlp.at(0).unwrap().at(5).unwrap().as_val::<H256>());
+
+    for i in 0..dec_rlp.item_count().unwrap() {
+        let item = dec_rlp.at(i).unwrap();
+        let item_count = item.item_count().unwrap();
+        println!("item {} item_count() = {}", i, item_count);
+        if item_count > 0 {
+            for i in 1..item_count {
+                println!("\tcontent {} = {:?}", i, item.at(i))
+            }
+        }
+        else {
+            println!("\t item {} content = {:?}", i, item);
+        }
+    }
+}
+
+fn print_rlp(item: rlp::Rlp, tab: &str) {
+    println!("{} contents:", tab);
+    if !item.is_list() {
+        println!("{}\t item = {:?}", tab, item);
+    }
+    else {
+        let item_count = item.item_count().unwrap();
+        for i in 0..item_count {
+            print!("{}\t item = ", tab);
+            print_rlp(item.at(i).unwrap(), &format!("{}\t", tab).as_str())
+        }
+    }
+}

@@ -243,7 +243,8 @@ fn run_test_sub_group(
 ) -> RunnerResult<TestSubGroupRunResults> {
     Ok(TestSubGroupRunResults {
         name: sub_group.name,
-        test_res: sub_group
+        test_res: 
+        sub_group
             .tests
             .into_iter()
             .map(|sub_g| run_test(sub_g, t_state))
