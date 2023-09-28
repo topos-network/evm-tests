@@ -15,7 +15,7 @@ use evm_arithmetization::{
 };
 use futures::executor::block_on;
 use indicatif::{ProgressBar, ProgressStyle};
-use log::warn;
+use log::{debug, trace, warn};
 use plonky2::{
     field::goldilocks_field::GoldilocksField, plonk::config::KeccakGoldilocksConfig,
     util::timing::TimingTree,
@@ -76,6 +76,7 @@ impl TestProgressIndicator for FancyProgressIndicator {
 pub(crate) enum TestStatus {
     PassedWitness,
     PassedProof,
+    NotRun,
     Ignored,
     EvmErr(String),
     TimedOut,
@@ -86,6 +87,7 @@ impl Display for TestStatus {
         match self {
             TestStatus::PassedWitness => write!(f, "Passed witness generation"),
             TestStatus::PassedProof => write!(f, "Passed proof verification"),
+            TestStatus::NotRun => write!(f, "NotRun"),
             TestStatus::Ignored => write!(f, "Ignored"),
             TestStatus::EvmErr(err) => write!(f, "Evm error: {}", err),
             TestStatus::TimedOut => write!(f, "Test timed out"),
@@ -139,6 +141,7 @@ struct TestRunState<'a> {
 
 pub(crate) fn run_plonky2_tests(
     parsed_tests: Vec<ParsedTestGroup>,
+    log_tests: bool,
     simple_progress_indicator: bool,
     persistent_test_state: &mut TestRunEntries,
     process_aborted: ProcessAbortedRecv,
@@ -163,7 +166,7 @@ pub(crate) fn run_plonky2_tests(
 
     parsed_tests
         .into_iter()
-        .map(|g| run_test_group(g, &mut t_state))
+        .map(|g| run_test_group(g, log_tests, &mut t_state))
         .collect::<RunnerResult<_>>()
 }
 
@@ -191,20 +194,33 @@ fn create_progress_indicator(
 
 fn run_test_group(
     group: ParsedTestGroup,
+    log_tests: bool,
     t_state: &mut TestRunState,
 ) -> RunnerResult<TestGroupRunResults> {
+    let group_name = group.name.clone();
     Ok(TestGroupRunResults {
-        name: group.name,
+        name: group_name.clone(),
         sub_group_res: group
             .sub_groups
             .into_iter()
-            .map(|sub_g| run_test_sub_group(sub_g, t_state))
+            .map(|sub_g| {
+                run_test_sub_group(
+                    group_name.clone(),
+                    sub_g.name.clone(),
+                    sub_g,
+                    log_tests,
+                    t_state,
+                )
+            })
             .collect::<RunnerResult<_>>()?,
     })
 }
 
 fn run_test_sub_group(
+    group_name: String,
+    subgroup_name: String,
     sub_group: ParsedTestSubGroup,
+    log_tests: bool,
     t_state: &mut TestRunState,
 ) -> RunnerResult<TestSubGroupRunResults> {
     Ok(TestSubGroupRunResults {
@@ -212,16 +228,39 @@ fn run_test_sub_group(
         test_res: sub_group
             .tests
             .into_iter()
-            .map(|sub_g| run_test(sub_g, t_state))
+            .map(|sub_g| {
+                run_test(
+                    group_name.clone(),
+                    subgroup_name.clone(),
+                    sub_g,
+                    log_tests,
+                    t_state,
+                )
+            })
             .collect::<RunnerResult<_>>()?,
     })
 }
 
-fn run_test(test: Test, t_state: &mut TestRunState) -> RunnerResult<TestRunResult> {
+fn run_test(
+    group_name: String,
+    subgroup_name: String,
+    test: Test,
+    log_tests: bool,
+    t_state: &mut TestRunState,
+) -> RunnerResult<TestRunResult> {
+    trace!("Running test {}...", test.name);
+
     t_state
         .p_indicator
         .set_current_test_name(test.name.to_string());
-    let res = run_test_or_fail_on_timeout(test.info, t_state)?;
+    let res = run_test_or_fail_on_timeout(
+        group_name,
+        subgroup_name,
+        test.name.to_string(),
+        test.info,
+        log_tests,
+        t_state,
+    )?;
 
     t_state
         .persistent_test_state
@@ -235,11 +274,24 @@ fn run_test(test: Test, t_state: &mut TestRunState) -> RunnerResult<TestRunResul
 }
 
 fn run_test_or_fail_on_timeout(
+    group: String,
+    subgroup: String,
+    name: String,
     test: TestVariantRunInfo,
+    log_tests: bool,
     t_state: &mut TestRunState,
 ) -> RunnerResult<TestStatus> {
     block_on(async {
-        let proof_gen_fut = async { run_test_and_get_test_result(test, t_state.witness_only) };
+        let proof_gen_fut = async {
+            run_test_and_get_test_result(
+                group,
+                subgroup,
+                name,
+                log_tests,
+                test,
+                t_state.witness_only,
+            )
+        };
         let proof_gen_with_timeout_fut = timeout(t_state.test_timeout, proof_gen_fut);
         let process_aborted_fut = t_state.process_aborted_recv.recv();
 
@@ -257,7 +309,18 @@ fn run_test_or_fail_on_timeout(
 }
 
 /// Run a test against `plonky2` and output a result based on what happens.
-fn run_test_and_get_test_result(test: TestVariantRunInfo, witness_only: bool) -> TestStatus {
+fn run_test_and_get_test_result(
+    group: String,
+    subgroup: String,
+    name: String,
+    log_tests: bool,
+    test: TestVariantRunInfo,
+    witness_only: bool,
+) -> TestStatus {
+    if log_tests {
+        log_test(group, subgroup, name, test);
+        return TestStatus::NotRun;
+    }
     let timing = TimingTree::new("prove", log::Level::Debug);
 
     match witness_only {
@@ -327,4 +390,23 @@ fn handle_evm_err(
     // The prover failed with unmodified inputs, so this is an actual error.
     warn!("{} failed with error: {:?}", gen_type, evm_err);
     TestStatus::EvmErr(evm_err.to_string())
+}
+
+fn log_test(group: String, subgroup: String, name: String, test: TestVariantRunInfo) {
+    debug!("Logging {:?} test", name);
+    let gen_inputs_serialized = serde_json::to_string(&test.gen_inputs).unwrap();
+    let path = "artifacts/";
+    if !std::fs::metadata(path).is_ok() {
+        std::fs::create_dir(path).unwrap();
+    }
+    let path = path.to_owned() + &group;
+    if !std::fs::metadata(&path).is_ok() {
+        std::fs::create_dir(&path).unwrap();
+    }
+    let path = path.clone().to_owned() + "/" + &subgroup;
+    if !std::fs::metadata(&path).is_ok() {
+        std::fs::create_dir(&path).unwrap();
+    }
+    let path = path.clone().to_owned() + "/" + &name + ".json";
+    std::fs::write(path, gen_inputs_serialized).unwrap();
 }

@@ -131,6 +131,7 @@ impl From<TestStatus> for PassState {
         match v {
             TestStatus::PassedWitness => PassState::PassedWitness,
             TestStatus::PassedProof => PassState::PassedProof,
+            TestStatus::NotRun => PassState::NotRun,
             TestStatus::Ignored => PassState::Ignored,
             TestStatus::EvmErr(_) | TestStatus::TimedOut => PassState::Failed,
         }

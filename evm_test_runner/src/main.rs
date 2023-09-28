@@ -60,6 +60,7 @@ async fn run() -> anyhow::Result<bool> {
         variant_filter,
         skip_passed,
         witness_only,
+        log_tests,
         test_timeout,
         blacklist_path,
         simple_progress_indicator,
@@ -140,6 +141,7 @@ async fn run() -> anyhow::Result<bool> {
 
     let test_res = match run_plonky2_tests(
         parsed_tests,
+        log_tests,
         simple_progress_indicator,
         &mut persistent_test_state,
         abort_recv,
@@ -164,7 +166,9 @@ async fn run() -> anyhow::Result<bool> {
         }
     }
 
-    persistent_test_state.write_to_disk();
+    if !log_tests {
+        persistent_test_state.write_to_disk();
+    }
 
     Ok(false)
 }

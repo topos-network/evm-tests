@@ -40,6 +40,10 @@ pub(crate) struct ProgArgs {
     #[arg(short = 'f', long)]
     pub(crate) test_filter: Option<String>,
 
+    /// Serialize the generation inputs for each test.
+    #[arg(short = 'l', long)]
+    pub(crate) log_tests: bool,
+
     /// Do not run tests that have already passed in the past or that are
     /// ignored.
     #[arg(short = 'p', long)]

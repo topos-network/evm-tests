@@ -738,6 +738,7 @@ dependencies = [
  "plonky2",
  "serde",
  "serde_cbor",
+ "serde_json",
  "similar",
  "termimad",
  "tokio",
