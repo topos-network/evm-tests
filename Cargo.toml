@@ -17,13 +17,13 @@ categories = ["cryptography"]
 anyhow = { version = "1.0.71", features = ["backtrace"] }
 clap = {version = "4.2.7", features = ["derive"] }
 ethereum-types = "0.14.1"
-mpt_trie = { git = "https://github.com/topos-protocol/zk_evm.git", rev = "62d4d5d09cad00a611fe0d41863cab3c8184b450" }
+mpt_trie = { git = "https://github.com/topos-protocol/zk_evm.git", rev = "b8f563a52567469609563608c5b4e82ecdba5614" }
 flexi_logger = { version = "0.25.4", features = ["async"] }
 futures = "0.3.28"
 keccak-hash = "0.10.0"
 log = "0.4.17"
 plonky2 = { git = "https://github.com/0xPolygonZero/plonky2.git", rev = "598ac876aea2cae5252ed3c2760bc441b7e8b661" }
-evm_arithmetization = { git = "https://github.com/topos-protocol/zk_evm.git", rev = "62d4d5d09cad00a611fe0d41863cab3c8184b450" }
+evm_arithmetization = { git = "https://github.com/topos-protocol/zk_evm.git", rev = "b8f563a52567469609563608c5b4e82ecdba5614" }
 serde = "1.0.163"
 serde_cbor = "0.11.2"
 tokio = { version = "1.28.1" }

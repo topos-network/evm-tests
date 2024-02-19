@@ -682,7 +682,7 @@ dependencies = [
 [[package]]
 name = "evm_arithmetization"
 version = "0.1.0"
-source = "git+https://github.com/topos-protocol/zk_evm.git?rev=62d4d5d09cad00a611fe0d41863cab3c8184b450#62d4d5d09cad00a611fe0d41863cab3c8184b450"
+source = "git+https://github.com/topos-protocol/zk_evm.git?rev=b8f563a52567469609563608c5b4e82ecdba5614#b8f563a52567469609563608c5b4e82ecdba5614"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1281,7 +1281,7 @@ dependencies = [
 [[package]]
 name = "mpt_trie"
 version = "0.1.0"
-source = "git+https://github.com/topos-protocol/zk_evm.git?rev=62d4d5d09cad00a611fe0d41863cab3c8184b450#62d4d5d09cad00a611fe0d41863cab3c8184b450"
+source = "git+https://github.com/topos-protocol/zk_evm.git?rev=b8f563a52567469609563608c5b4e82ecdba5614#b8f563a52567469609563608c5b4e82ecdba5614"
 dependencies = [
  "bytes",
  "enum-as-inner",
